@@ -34,6 +34,8 @@
             /* Vector Graphics Injection */
             --svg-circle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%23ffffff'/%3E%3C/svg%3E");
             --svg-cross: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%23ffffff' stroke-width='3.5' stroke-linecap='round' d='M4,4 L20,20 M20,4 L4,20'/%3E%3C/svg%3E");
+            --svg-letter-r: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext x='12' y='12' font-family='sans-serif' font-weight='bold' font-size='18' fill='%23ffffff' text-anchor='middle' dominant-baseline='central'%3ER%3C/text%3E%3C/svg%3E");
+            --svg-letter-l: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext x='12' y='12' font-family='sans-serif' font-weight='bold' font-size='18' fill='%23ffffff' text-anchor='middle' dominant-baseline='central'%3EL%3C/text%3E%3C/svg%3E");
         }
 
         body.light-mode {
@@ -58,6 +60,8 @@
             
             --svg-circle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%231a1a1a'/%3E%3C/svg%3E");
             --svg-cross: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%231a1a1a' stroke-width='3.5' stroke-linecap='round' d='M4,4 L20,20 M20,4 L4,20'/%3E%3C/svg%3E");
+            --svg-letter-r: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext x='12' y='12' font-family='sans-serif' font-weight='bold' font-size='18' fill='%231a1a1a' text-anchor='middle' dominant-baseline='central'%3ER%3C/text%3E%3C/svg%3E");
+            --svg-letter-l: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext x='12' y='12' font-family='sans-serif' font-weight='bold' font-size='18' fill='%231a1a1a' text-anchor='middle' dominant-baseline='central'%3EL%3C/text%3E%3C/svg%3E");
         }
 
         * {
@@ -323,7 +327,7 @@
             background-color: var(--step-hover);
         }
 
-        /* Active Note Toggle States: Center files directly inside the physical frame layouts */
+        /* Active Note Toggle States: Vector images inherit the absolute scale constraints */
         .step.active, .step.hand-R, .step.hand-L {
             border-color: transparent !important;
             background-color: transparent !important;
@@ -340,15 +344,13 @@
             background-image: var(--svg-cross);
         }
 
-        /* Handedness Pseudo Notation Layering */
-        .step.hand-R::after, .step.hand-L::after {
-            font-size: 15px;
-            font-weight: bold;
-            color: var(--text-color);
-            line-height: 1;
+        .step.hand-R {
+            background-image: var(--svg-letter-r);
         }
-        .step.hand-R::after { content: 'R'; }
-        .step.hand-L::after { content: 'L'; }
+
+        .step.hand-L {
+            background-image: var(--svg-letter-l);
+        }
 
         /* Dedicated Channel Spacers & Unified Measure Barlines */
         .gap-beat-space { min-width: 0; }
@@ -534,9 +536,12 @@
                 background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%23000000' stroke-width='3.5' stroke-linecap='round' d='M4,4 L20,20 M20,4 L4,20'/%3E%3C/svg%3E") !important;
             }
 
-            .step.hand-R::after, .step.hand-L::after {
-                color: #000000 !important;
-                font-size: 13px !important;
+            .step.hand-R {
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext x='12' y='12' font-family='sans-serif' font-weight='bold' font-size='18' fill='%23000000' text-anchor='middle' dominant-baseline='central'%3ER%3C/text%3E%3C/svg%3E") !important;
+            }
+
+            .step.hand-L {
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext x='12' y='12' font-family='sans-serif' font-weight='bold' font-size='18' fill='%23000000' text-anchor='middle' dominant-baseline='central'%3EL%3C/text%3E%3C/svg%3E") !important;
             }
 
             .gap-bar-line::before {
