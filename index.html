@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Drum Groove Composition</title>
+    <style>
+        /* Theme Variables */
+        body {
+            /* Default Dark Mode */
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --text-color: #ffffff;
+            --text-muted: #666666;
+            --step-bg: #171717;      
+            --step-border: #222222;  
+            --step-hover: #262626;
+            --bar-divider: #00adb5; 
+            --select-bg: #2d2d2d;
+            
+            /* Accent Colors */
+            --accent-color: #00adb5;
+            --accent-border: #00f5ff;
+            --clear-btn: #821c31;
+            --clear-btn-hover: #b82945;
+            --theme-btn: #333333;
+            --theme-btn-hover: #444444;
+            --add-btn: #1b7a43;
+            --add-btn-hover: #27a85e;
+            --copy-btn: #2d62a3;
+            --copy-btn-hover: #3b7cd1;
+            --del-hover: #ff2e63;
+            
+            /* Vector Graphics Injection */
+            --svg-circle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%23ffffff'/%3E%3C/svg%3E");
+            --svg-cross: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%23ffffff' stroke-width='3.5' stroke-linecap='round' d='M4,4 L20,20 M20,4 L4,20'/%3E%3C/svg%3E");
+        }
+
+        body.light-mode {
+            /* Light Mode Overrides */
+            --bg-color: #f8f9fa;
+            --panel-bg: #ffffff;
+            --text-color: #1a1a1a;
+            --text-muted: #b5b5b5;
+            --step-bg: #f1f3f4;      
+            --step-border: #e2e6e9;  
+            --step-hover: #e8eaed;
+            --bar-divider: #1a1a1a; 
+            --select-bg: #e4e6eb;
+            
+            --theme-btn: #e4e6eb;
+            --theme-btn-hover: #d8dadf;
+            --add-btn: #d2e9d9;
+            --add-btn-hover: #bee3cb;
+            --copy-btn: #d0e1f9;
+            --copy-btn-hover: #b5d1f7;
+            --del-hover: #e61a4c;
+            
+            --svg-circle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%231a1a1a'/%3E%3C/svg%3E");
+            --svg-cross: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%231a1a1a' stroke-width='3.5' stroke-linecap='round' d='M4,4 L20,20 M20,4 L4,20'/%3E%3C/svg%3E");
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        /* Control Panel Header */
+        header {
+            background-color: var(--panel-bg);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid var(--step-border);
+            transition: background-color 0.2s, border-color 0.2s;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        /* Configurable Project Title Input */
+        .title-container {
+            flex-grow: 1;
+            min-width: 180px;
+        }
+
+        #projectTitle {
+            font-size: 1.3rem;
+            font-weight: bold;
+            background: transparent;
+            border: none;
+            color: var(--accent-color);
+            outline: none;
+            width: 100%;
+            padding: 4px 0;
+            border-bottom: 2px dashed transparent;
+            text-overflow: ellipsis;
+        }
+
+        #projectTitle:hover, #projectTitle:focus {
+            border-bottom-color: var(--step-border);
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            color: var(--text-color);
+        }
+
+        select, input[type="number"] {
+            background-color: var(--select-bg);
+            color: var(--text-color);
+            border: 1px solid var(--step-border);
+            padding: 6px 10px;
+            font-size: 14px;
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        input[type="number"] {
+            width: 65px;
+        }
+
+        button {
+            color: var(--text-color);
+            border: 1px solid var(--step-border);
+            padding: 7px 14px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        /* Repositioned Add Button Styling */
+        .add-btn {
+            background-color: var(--add-btn);
+            border-color: transparent;
+            align-self: flex-start;
+            margin-top: -10px; 
+            padding: 10px 20px;
+            font-size: 14px;
+        }
+        body.light-mode .add-btn { color: #11522c; }
+        .add-btn:hover { background-color: var(--add-btn-hover); }
+
+        .theme-btn {
+            background-color: var(--theme-btn);
+        }
+        .theme-btn:hover {
+            background-color: var(--theme-btn-hover);
+            border-color: var(--accent-color);
+        }
+
+        .clear-btn {
+            background-color: var(--clear-btn);
+            border-color: var(--clear-btn-hover);
+            color: #ffffff;
+        }
+        .clear-btn:hover {
+            background-color: var(--clear-btn-hover);
+        }
+
+        /* Full Screen Notation Scroll Container */
+        .notation-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 40px 20px;
+            gap: 24px; 
+            height: calc(100vh - 70px);
+            overflow-y: auto; 
+            overflow-x: hidden; 
+        }
+
+        /* Isolated container wrapping only active music rows */
+        .notation-grid-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 48px; 
+        }
+
+        .track-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            width: 100%;
+        }
+
+        /* Beat Count Column Header Row Overrides */
+        .track-row.header-row {
+            margin-bottom: -32px; 
+        }
+
+        /* Instrument Control Label Area */
+        .label-ctrls {
+            display: flex;
+            align-items: center;
+            width: 220px; 
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .header-label-spacer {
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-color);
+            opacity: 0.6;
+            padding-left: 6px;
+        }
+
+        .instrument-label-input {
+            flex: 1;
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-color);
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 13px;
+            letter-spacing: 1px;
+            padding: 6px;
+            border-radius: 4px;
+            min-width: 0;
+        }
+
+        .instrument-label-input:hover {
+            background: var(--panel-bg);
+            border-color: var(--step-border);
+        }
+
+        .instrument-label-input:focus {
+            background: var(--panel-bg);
+            border-color: var(--accent-color);
+            outline: none;
+        }
+
+        .symbol-select {
+            padding: 4px 6px;
+            font-size: 12px;
+            width: 55px;
+            flex-shrink: 0;
+        }
+
+        .delete-track-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 18px;
+            padding: 4px 6px;
+            cursor: pointer;
+            line-height: 1;
+            border-radius: 4px;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+
+        .delete-track-btn:hover {
+            color: var(--del-hover);
+            background: rgba(255, 46, 99, 0.1);
+        }
+
+        /* Dynamic Step Grid Layout */
+        .grid-steps {
+            flex: 1;
+            display: grid;
+            gap: 4px; 
+            min-width: 0;
+        }
+
+        /* Individual Header Metric Containers */
+        .header-count-cell {
+            font-size: 13px;
+            font-weight: bold;
+            color: var(--accent-color);
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            min-width: 0;
+            padding-bottom: 4px;
+            text-transform: lowercase;
+        }
+
+        /* Individual Step Blocks - Strict Squares */
+        .step {
+            background-color: var(--step-bg);
+            border: 1px solid var(--step-border);
+            border-radius: 3px;
+            cursor: pointer;
+            aspect-ratio: 1; 
+            position: relative; 
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.1s, border-color 0.1s;
+        }
+
+        .step:hover {
+            background-color: var(--step-hover);
+        }
+
+        /* Active Note Toggle State: Center vector files directly inside the physical frame layouts */
+        .step.active {
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 65%;
+        }
+
+        .track-row.sym-circle .step.active {
+            background-image: var(--svg-circle);
+        }
+
+        .track-row.sym-cross .step.active {
+            background-image: var(--svg-cross);
+        }
+
+        /* Dedicated Channel Spacers & Unified Measure Barlines */
+        .gap-beat-space { min-width: 0; }
+        .gap-bar-line { min-width: 0; position: relative; }
+
+        .gap-bar-line::before {
+            content: '';
+            position: absolute;
+            width: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            top: -26px; 
+            bottom: -26px; 
+            background-color: var(--bar-divider);
+            z-index: 2;
+            transition: background-color 0.15s, box-shadow 0.15s;
+        }
+
+        .track-row.header-row .gap-bar-line::before {
+            display: none !important;
+        }
+
+        /* Contextual Popover Copy Menu Overrides */
+        .bar-copy-menu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 20;
+            background-color: var(--panel-bg);
+            border: 1px solid var(--accent-color);
+            padding: 4px;
+            border-radius: 6px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+            white-space: nowrap;
+        }
+
+        /* Highlight visual boundary markers on active user hover interactions */
+        .gap-bar-line:hover::before {
+            background-color: var(--accent-border) !important;
+            box-shadow: 0 0 8px var(--accent-border);
+        }
+
+        .gap-bar-line:hover .bar-copy-menu {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .bar-copy-inline-btn {
+            background-color: var(--select-bg);
+            color: var(--text-color);
+            border: 1px solid var(--step-border);
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .bar-copy-inline-btn:hover {
+            background-color: var(--accent-color);
+            color: #ffffff;
+            border-color: var(--accent-border);
+        }
+
+        .bar-copy-inline-btn.del-btn {
+            background-color: var(--clear-btn);
+            border-color: var(--clear-btn-hover);
+            color: #ffffff;
+        }
+
+        .bar-copy-inline-btn.del-btn:hover {
+            background-color: var(--clear-btn-hover);
+            border-color: #ff2e63;
+        }
+
+        /* ==========================================================================
+           🖨️ HARD SAFETY PRINT-MODE CONFIGURATION STYLES
+           ========================================================================== */
+        @media print {
+            /* Force Default Page Printing to Landscape Formats and Suppress Browser Metadata (Headers/Footers) */
+            @page {
+                size: landscape;
+                margin: 0; 
+            }
+
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            body {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+                height: auto !important;
+                overflow: visible !important;
+                padding: 1cm !important; /* Adds page safety buffer margin entirely inside document canvas */
+            }
+
+            header {
+                background-color: #ffffff !important;
+                border-bottom: 2px solid #000000 !important;
+                padding: 10px 0 !important;
+            }
+
+            .controls,
+            .delete-track-btn,
+            .symbol-select,
+            .bar-copy-menu,
+            #addTrackBtn {
+                display: none !important;
+            }
+
+            .notation-container {
+                padding: 20px 0 !important;
+                height: auto !important;
+                overflow: visible !important;
+            }
+
+            .notation-grid-wrapper {
+                gap: 36px !important; 
+            }
+
+            .track-row.header-row {
+                margin-bottom: -20px !important;
+            }
+
+            /* FIXED UNIFORMITY: Freeze track name widths to ensure identical grid starts */
+            .label-ctrls {
+                width: 140px !important;
+                flex-shrink: 0 !important;
+                display: flex !important;
+            }
+
+            .header-count-cell {
+                color: #000000 !important;
+            }
+
+            #projectTitle {
+                color: #000000 !important;
+                border: none !important;
+                padding: 0 !important;
+                pointer-events: none !important;
+            }
+
+            .instrument-label-input {
+                color: #000000 !important;
+                border: none !important;
+                background: transparent !important;
+                padding: 0 !important;
+                pointer-events: none !important;
+                width: 100% !important;
+            }
+
+            /* Maintain physical bounding frame symmetry for both empty and active grid elements */
+            .step {
+                background-color: transparent !important; 
+                border: 1px solid #d0d0d0 !important; 
+                border-radius: 2px !important;
+            }
+
+            /* Lock container bounds to keep box proportions identical to empty cell blocks */
+            .step.active {
+                background-color: transparent !important; 
+                border-color: #d0d0d0 !important;
+                background-repeat: no-repeat !important;
+                background-position: center !important;
+                background-size: 65% !important;
+            }
+
+            /* Force crisp solid black presentation vector systems maximized for hardware printer runs */
+            .track-row.sym-circle .step.active {
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%23000000'/%3E%3C/svg%3E") !important;
+            }
+
+            .track-row.sym-cross .step.active {
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%23000000' stroke-width='3.5' stroke-linecap='round' d='M4,4 L20,20 M20,4 L4,20'/%3E%3C/svg%3E") !important;
+            }
+
+            .gap-bar-line::before {
+                background-color: #000000 !important; 
+                width: 4px !important;
+                top: -16px !important;
+                bottom: -16px !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="title-container">
+            <input type="text" id="projectTitle" value="My Drum Groove Composition">
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="timeSigSelect">Time:</label>
+                <select id="timeSigSelect">
+                    <option value="4/4" selected>4/4</option>
+                    <option value="3/4">3/4</option>
+                    <option value="2/4">2/4</option>
+                    <option value="6/8">6/8</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="barsSelect">Bars:</label>
+                <input type="number" id="barsSelect" min="1" max="16" value="2">
+            </div>
+            
+            <div class="control-group">
+                <label for="subdivisionSelect">Subdivision:</label>
+                <select id="subdivisionSelect">
+                </select>
+            </div>
+
+            <button class="theme-btn" id="themeBtn">Theme</button>
+            <button class="clear-btn" id="clearBtn">Clear</button>
+        </div>
+    </header>
+
+    <div class="notation-container">
+        <div class="notation-grid-wrapper" id="notationGrid"></div>
+        <button class="add-btn" id="addTrackBtn">+ Add Track</button>
+    </div>
+
+    <script>
+        var timeSigConfig = {
+            '4/4': { beats: 4, subs: [{v:'quarter', l:'Quarter Notes', m:1}, {v:'8th', l:'8th Notes', m:2}, {v:'12th', l:'12th Notes (Triplets)', m:3}, {v:'16th', l:'16th Notes', m:4}] },
+            '3/4': { beats: 3, subs: [{v:'quarter', l:'Quarter Notes', m:1}, {v:'8th', l:'8th Notes', m:2}, {v:'12th', l:'12th Notes (Triplets)', m:3}, {v:'16th', l:'16th Notes', m:4}] },
+            '2/4': { beats: 2, subs: [{v:'quarter', l:'Quarter Notes', m:1}, {v:'8th', l:'8th Notes', m:2}, {v:'12th', l:'12th Notes (Triplets)', m:3}, {v:'16th', l:'16th Notes', m:4}] },
+            '6/8': { beats: 6, subs: [{v:'8th', l:'8th Notes', m:1}, {v:'16th', l:'16th Notes', m:2}] }
+        };
+
+        var liveInstrumentsMemory = [
+            { id: 'hihat', defaultName: 'hihat', symbol: 'cross' },
+            { id: 'snare', defaultName: 'snare', symbol: 'circle' },
+            { id: 'bass',  defaultName: 'bass',  symbol: 'circle' }
+        ];
+
+        var gridContainer = document.getElementById('notationGrid');
+        var timeSigSelect = document.getElementById('timeSigSelect');
+        var barsSelect = document.getElementById('barsSelect');
+        var subdivisionSelect = document.getElementById('subdivisionSelect');
+        var addTrackBtn = document.getElementById('addTrackBtn');
+        var projectTitle = document.getElementById('projectTitle');
+
+        var globalCachedGridTemplate = "";
+        var globalCachedTotalSteps = 0;
+
+        function getSanitizedBarsCount() {
+            var val = parseInt(barsSelect.value, 10);
+            if (isNaN(val) || val < 1) return 1;
+            return val;
+        }
+
+        function updateSubdivisionDropdown() {
+            var sig = timeSigSelect.value;
+            var options = timeSigConfig[sig].subs;
+            
+            subdivisionSelect.innerHTML = '';
+            for (var i = 0; i < options.length; i++) {
+                var opt = document.createElement('option');
+                opt.value = options[i].v;
+                opt.textContent = options[i].l;
+                subdivisionSelect.appendChild(opt);
+            }
+            subdivisionSelect.value = '16th';
+        }
+
+        // Encodes the dynamic session schema directly into standard URL search parameters
+        function updateURL() {
+            var titleVal = projectTitle.value;
+            var timeVal = timeSigSelect.value;
+            var barsVal = barsSelect.value;
+            var subVal = subdivisionSelect.value;
+            
+            var savedNotes = extractCurrentNotes(); 
+            var tracksPayload = liveInstrumentsMemory.map(function(inst) {
+                return {
+                    id: inst.id,
+                    name: inst.defaultName,
+                    sym: inst.symbol,
+                    notes: savedNotes[inst.id] || []
+                };
+            });
+
+            var params = new URLSearchParams();
+            params.set('title', titleVal);
+            params.set('time', timeVal);
+            params.set('bars', barsVal);
+            params.set('sub', subVal);
+            params.set('tracks', JSON.stringify(tracksPayload));
+
+            var newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?' + params.toString();
+            window.history.replaceState({ path: newUrl }, '', newUrl);
+        }
+
+        // Extracts all active indices from DOM grouped by instrument ID
+        function extractCurrentNotes() {
+            var savedData = {};
+            var rows = document.querySelectorAll('.track-row:not(.header-row)');
+            for (var r = 0; r < rows.length; r++) {
+                var row = rows[r];
+                var instId = row.getAttribute('data-instrument');
+                var steps = row.querySelectorAll('.step');
+                var activeIndices = [];
+                for (var s = 0; s < steps.length; s++) {
+                    var step = steps[s];
+                    var stepIdx = parseInt(step.getAttribute('data-step'), 10);
+                    if (step.classList.contains('active')) {
+                        activeIndices.push(stepIdx);
+                    }
+                }
+                savedData[instId] = activeIndices;
+            }
+            return savedData;
+        }
+
+        // Restores calculated active classes to matching steps inside DOM tracking rows
+        function restoreNotes(savedData) {
+            var rows = document.querySelectorAll('.track-row:not(.header-row)');
+            for (var r = 0; r < rows.length; r++) {
+                var row = rows[r];
+                var instId = row.getAttribute('data-instrument');
+                if (savedData[instId]) {
+                    var activeIndices = savedData[instId];
+                    for (var a = 0; a < activeIndices.length; a++) {
+                        var stepIdx = activeIndices[a];
+                        var step = row.querySelector('[data-step="' + stepIdx + '"]');
+                        if (step) {
+                            step.classList.add('active');
+                        }
+                    }
+                }
+            }
+        }
+
+        function executeBarCopy(fromBarIdx, toBarIdx) {
+            if (fromBarIdx === toBarIdx) return; 
+
+            var sig = timeSigSelect.value;
+            var subVal = subdivisionSelect.value;
+            var currentSigConfig = timeSigConfig[sig];
+            var currentSub = currentSigConfig.subs.find(function(s) { return s.v === subVal; }) || currentSigConfig.subs[0];
+            
+            var stepsPerBar = currentSigConfig.beats * currentSub.m;
+            var sourceOffset = fromBarIdx * stepsPerBar;
+            var targetOffset = toBarIdx * stepsPerBar;
+
+            var allVisibleRows = document.querySelectorAll('.track-row:not(.header-row)');
+            for (var r = 0; r < allVisibleRows.length; r++) {
+                var currentRow = allVisibleRows[r];
+                for (var i = 0; i < stepsPerBar; i++) {
+                    var sourceBox = currentRow.querySelector('[data-step="' + (sourceOffset + i) + '"]');
+                    var targetBox = currentRow.querySelector('[data-step="' + (targetOffset + i) + '"]');
+                    
+                    if (sourceBox && targetBox) {
+                        if (sourceBox.classList.contains('active')) {
+                            targetBox.classList.add('active');
+                        } else {
+                            targetBox.classList.remove('active');
+                        }
+                    }
+                }
+            }
+            updateURL();
+        }
+
+        function executeBarDeletion(targetBarIdx) {
+            var currentBars = getSanitizedBarsCount();
+            if (currentBars <= 1) return; 
+
+            var sig = timeSigSelect.value;
+            var subVal = subdivisionSelect.value;
+            var currentSigConfig = timeSigConfig[sig];
+            var currentSub = currentSigConfig.subs.find(function(s) { return s.v === subVal; }) || currentSigConfig.subs[0];
+            var stepsPerBar = currentSigConfig.beats * currentSub.m;
+
+            var startDelIdx = targetBarIdx * stepsPerBar;
+            var endDelIdx = startDelIdx + stepsPerBar;
+
+            var savedNotes = extractCurrentNotes();
+            var newNotes = {};
+
+            for (var instId in savedNotes) {
+                if (savedNotes.hasOwnProperty(instId)) {
+                    var oldIndices = savedNotes[instId];
+                    var newIndices = [];
+
+                    for (var i = 0; i < oldIndices.length; i++) {
+                        var idx = oldIndices[i];
+                        if (idx >= startDelIdx && idx < endDelIdx) {
+                            continue; 
+                        } else if (idx >= endDelIdx) {
+                            newIndices.push(idx - stepsPerBar); 
+                        } else {
+                            newIndices.push(idx); 
+                        }
+                    }
+                    newNotes[instId] = newIndices;
+                }
+            }
+
+            barsSelect.value = currentBars - 1;
+            buildNotationGrid();
+            restoreNotes(newNotes);
+            updateURL();
+        }
+
+        function executeOuterBarAddition(type) {
+            var currentBars = getSanitizedBarsCount();
+            if (currentBars >= 16) return; 
+
+            var sig = timeSigSelect.value;
+            var subVal = subdivisionSelect.value;
+            var currentSigConfig = timeSigConfig[sig];
+            var currentSub = currentSigConfig.subs.find(function(s) { return s.v === subVal; }) || currentSigConfig.subs[0];
+            var stepsPerBar = currentSigConfig.beats * currentSub.m;
+
+            var savedNotes = extractCurrentNotes();
+            var newNotes = {};
+
+            for (var instId in savedNotes) {
+                if (savedNotes.hasOwnProperty(instId)) {
+                    var oldIndices = savedNotes[instId];
+                    var newIndices = [];
+
+                    if (type === 'start') {
+                        for (var i = 0; i < oldIndices.length; i++) {
+                            var oldIdx = oldIndices[i];
+                            newIndices.push(oldIdx + stepsPerBar); 
+                            if (oldIdx < stepsPerBar) {
+                                newIndices.push(oldIdx); 
+                            }
+                        }
+                    } else if (type === 'end') {
+                        var lastBarStartIdx = (currentBars - 1) * stepsPerBar;
+                        for (var i = 0; i < oldIndices.length; i++) {
+                            var oldIdx = oldIndices[i];
+                            newIndices.push(oldIdx); 
+                            if (oldIdx >= lastBarStartIdx) {
+                                newIndices.push(oldIdx + stepsPerBar); 
+                            }
+                        }
+                    }
+                    newNotes[instId] = newIndices;
+                }
+            }
+
+            barsSelect.value = currentBars + 1;
+            buildNotationGrid();
+            restoreNotes(newNotes);
+            updateURL();
+        }
+
+        function generateContextualCopyMenu(containerElement, leftIndex, rightIndex) {
+            var menu = document.createElement('div');
+            menu.classList.add('bar-copy-menu');
+            
+            var totalBars = getSanitizedBarsCount();
+
+            var btnCopyLeft = document.createElement('button');
+            btnCopyLeft.className = 'bar-copy-inline-btn';
+            btnCopyLeft.innerHTML = '◂ Copy Left';
+            btnCopyLeft.title = 'Copy Bar ' + (rightIndex + 1) + ' into Bar ' + (leftIndex + 1);
+            btnCopyLeft.onclick = function(e) {
+                e.stopPropagation();
+                executeBarCopy(rightIndex, leftIndex); 
+            };
+            menu.appendChild(btnCopyLeft);
+
+            if (totalBars > 1) {
+                var btnDelLeft = document.createElement('button');
+                btnDelLeft.className = 'bar-copy-inline-btn del-btn';
+                btnDelLeft.innerHTML = 'Del Left ✖';
+                btnDelLeft.title = 'Delete Bar ' + (leftIndex + 1);
+                btnDelLeft.onclick = function(e) {
+                    e.stopPropagation();
+                    executeBarDeletion(leftIndex);
+                };
+                menu.appendChild(btnDelLeft);
+
+                var btnDelRight = document.createElement('button');
+                btnDelRight.className = 'bar-copy-inline-btn del-btn';
+                btnDelRight.innerHTML = '✖ Del Right';
+                btnDelRight.title = 'Delete Bar ' + (rightIndex + 1);
+                btnDelRight.onclick = function(e) {
+                    e.stopPropagation();
+                    executeBarDeletion(rightIndex);
+                };
+                menu.appendChild(btnDelRight);
+            }
+
+            var btnCopyRight = document.createElement('button');
+            btnCopyRight.className = 'bar-copy-inline-btn';
+            btnCopyRight.innerHTML = 'Copy Right ▸';
+            btnCopyRight.title = 'Copy Bar ' + (leftIndex + 1) + ' into Bar ' + (rightIndex + 1);
+            btnCopyRight.onclick = function(e) {
+                e.stopPropagation();
+                executeBarCopy(leftIndex, rightIndex); 
+            };
+            menu.appendChild(btnCopyRight);
+
+            containerElement.appendChild(menu);
+        }
+
+        function generateOuterBoundaryMenu(containerElement, type) {
+            var menu = document.createElement('div');
+            menu.classList.add('bar-copy-menu');
+            
+            var totalBars = getSanitizedBarsCount();
+
+            if (type === 'start') {
+                var btnLeft = document.createElement('button');
+                btnLeft.className = 'bar-copy-inline-btn';
+                btnLeft.innerHTML = '◂ Copy Left';
+                btnLeft.title = 'Create new front bar from first bar content';
+                btnLeft.onclick = function(e) {
+                    e.stopPropagation();
+                    executeOuterBarAddition('start');
+                };
+                menu.appendChild(btnLeft);
+
+                if (totalBars > 1) {
+                    var btnDelRight = document.createElement('button');
+                    btnDelRight.className = 'bar-copy-inline-btn del-btn';
+                    btnDelRight.innerHTML = '✖ Del Right';
+                    btnDelRight.title = 'Delete the first bar';
+                    btnDelRight.onclick = function(e) {
+                        e.stopPropagation();
+                        executeBarDeletion(0);
+                    };
+                    menu.appendChild(btnDelRight);
+                }
+            } else if (type === 'end') {
+                if (totalBars > 1) {
+                    var btnDelLeft = document.createElement('button');
+                    btnDelLeft.className = 'bar-copy-inline-btn del-btn';
+                    btnDelLeft.innerHTML = 'Del Left ✖';
+                    btnDelLeft.title = 'Delete the last bar';
+                    btnDelLeft.onclick = function(e) {
+                        e.stopPropagation();
+                        executeBarDeletion(totalBars - 1);
+                    };
+                    menu.appendChild(btnDelLeft);
+                }
+
+                var btnRight = document.createElement('button');
+                btnRight.className = 'bar-copy-inline-btn';
+                btnRight.innerHTML = 'Copy Right ▸';
+                btnRight.title = 'Create new end bar from last bar content';
+                btnRight.onclick = function(e) {
+                    e.stopPropagation();
+                    executeOuterBarAddition('end');
+                };
+                menu.appendChild(btnRight);
+            }
+
+            containerElement.appendChild(menu);
+        }
+
+        function buildGridHeaderElement(totalBars, beatsPerBar, multiplier, gridStyleString, sig) {
+            var headerRow = document.createElement('div');
+            headerRow.classList.add('track-row', 'header-row');
+
+            var labelSpacer = document.createElement('div');
+            labelSpacer.classList.add('label-ctrls', 'header-label-spacer');
+            labelSpacer.textContent = "Track / Beat";
+            headerRow.appendChild(labelSpacer);
+
+            var stepsContainer = document.createElement('div');
+            stepsContainer.classList.add('grid-steps');
+            stepsContainer.style.gridTemplateColumns = gridStyleString;
+
+            var subLabels = [''];
+            if (sig !== '6/8') {
+                if (multiplier === 2) subLabels = ['', '&'];
+                if (multiplier === 3) subLabels = ['', 'la', 'li'];
+                if (multiplier === 4) subLabels = ['', 'e', '&', 'a'];
+            } else {
+                if (multiplier === 2) subLabels = ['', '&'];
+            }
+
+            var startBoundaryGap = document.createElement('div');
+            startBoundaryGap.classList.add('gap-bar-line');
+            generateOuterBoundaryMenu(startBoundaryGap, 'start');
+            stepsContainer.appendChild(startBoundaryGap);
+
+            for (var b = 0; b < totalBars; b++) {
+                if (b > 0) {
+                    var barGap = document.createElement('div');
+                    barGap.classList.add('gap-bar-line');
+                    generateContextualCopyMenu(barGap, b - 1, b);
+                    stepsContainer.appendChild(barGap);
+                }
+                for (var bt = 0; bt < beatsPerBar; bt++) {
+                    if (bt > 0) {
+                        var beatGap = document.createElement('div');
+                        beatGap.classList.add('gap-beat-space');
+                        stepsContainer.appendChild(beatGap);
+                    }
+                    for (var s = 0; s < multiplier; s++) {
+                        var countCell = document.createElement('div');
+                        countCell.classList.add('header-count-cell');
+                        
+                        if (s === 0) {
+                            countCell.textContent = (bt + 1); 
+                        } else {
+                            countCell.textContent = subLabels[s] || ''; 
+                            countCell.style.opacity = '0.4';
+                            countCell.style.fontSize = '11px';
+                        }
+                        stepsContainer.appendChild(countCell);
+                    }
+                }
+            }
+
+            var endBoundaryGap = document.createElement('div');
+            endBoundaryGap.classList.add('gap-bar-line');
+            generateOuterBoundaryMenu(endBoundaryGap, 'end');
+            stepsContainer.appendChild(endBoundaryGap);
+
+            headerRow.appendChild(stepsContainer);
+            gridContainer.appendChild(headerRow);
+        }
+
+        function appendSingleRowElement(inst, totalBars, beatsPerBar, multiplier, gridStyleString) {
+            var row = document.createElement('div');
+            row.classList.add('track-row', 'sym-' + inst.symbol);
+            row.setAttribute('data-instrument', inst.id);
+
+            var labelCtrls = document.createElement('div');
+            labelCtrls.classList.add('label-ctrls');
+
+            var symSelect = document.createElement('select');
+            symSelect.classList.add('symbol-select');
+            
+            var optCircle = document.createElement('option');
+            optCircle.value = 'circle'; optCircle.textContent = '●';
+            var optCross = document.createElement('option');
+            optCross.value = 'cross'; optCross.textContent = '✖';
+            
+            symSelect.appendChild(optCircle);
+            symSelect.appendChild(optCross);
+            symSelect.value = inst.symbol;
+            
+            symSelect.onchange = function() {
+                row.classList.remove('sym-circle', 'sym-cross');
+                inst.symbol = this.value;
+                row.classList.add('sym-' + inst.symbol);
+                updateURL();
+            };
+            labelCtrls.appendChild(symSelect);
+
+            var input = document.createElement('input');
+            input.type = 'text';
+            input.classList.add('instrument-label-input');
+            input.value = inst.defaultName;
+            input.oninput = function() {
+                inst.defaultName = this.value;
+                updateURL();
+            };
+            labelCtrls.appendChild(input);
+
+            var delBtn = document.createElement('button');
+            delBtn.classList.add('delete-track-btn');
+            delBtn.innerHTML = '&times;';
+            delBtn.title = "Delete Track";
+            delBtn.onclick = function() {
+                for (var m = 0; m < liveInstrumentsMemory.length; m++) {
+                    if (liveInstrumentsMemory[m].id === inst.id) {
+                        liveInstrumentsMemory.splice(m, 1);
+                        break;
+                    }
+                }
+                row.remove(); 
+                updateURL();
+            };
+            labelCtrls.appendChild(delBtn);
+            row.appendChild(labelCtrls);
+
+            var stepsContainer = document.createElement('div');
+            stepsContainer.classList.add('grid-steps');
+            stepsContainer.style.gridTemplateColumns = gridStyleString;
+
+            var startBoundaryGap = document.createElement('div');
+            startBoundaryGap.classList.add('gap-bar-line');
+            generateOuterBoundaryMenu(startBoundaryGap, 'start');
+            stepsContainer.appendChild(startBoundaryGap);
+
+            var globalStepIndex = 0;
+            for (var b = 0; b < totalBars; b++) {
+                if (b > 0) {
+                    var barGap = document.createElement('div');
+                    barGap.classList.add('gap-bar-line');
+                    generateContextualCopyMenu(barGap, b - 1, b);
+                    stepsContainer.appendChild(barGap);
+                }
+                for (var bt = 0; bt < beatsPerBar; bt++) {
+                    if (bt > 0) {
+                        var beatGap = document.createElement('div');
+                        beatGap.classList.add('gap-beat-space');
+                        stepsContainer.appendChild(beatGap);
+                    }
+                    for (var s = 0; s < multiplier; s++) {
+                        var step = document.createElement('div');
+                        step.classList.add('step');
+                        step.setAttribute('data-step', globalStepIndex);
+
+                        step.onclick = function() {
+                            this.classList.toggle('active');
+                            updateURL();
+                        };
+
+                        stepsContainer.appendChild(step);
+                        globalStepIndex++;
+                    }
+                }
+            }
+
+            var endBoundaryGap = document.createElement('div');
+            endBoundaryGap.classList.add('gap-bar-line');
+            generateOuterBoundaryMenu(endBoundaryGap, 'end');
+            stepsContainer.appendChild(endBoundaryGap);
+
+            row.appendChild(stepsContainer);
+            gridContainer.appendChild(row);
+        }
+
+        function buildNotationGrid() {
+            gridContainer.innerHTML = '';
+
+            var sig = timeSigSelect.value;
+            var subVal = subdivisionSelect.value;
+            var totalBars = getSanitizedBarsCount();
+            var currentSigConfig = timeSigConfig[sig];
+            
+            var beatsPerBar = currentSigConfig.beats;
+            var currentSub = null;
+            for (var s = 0; s < currentSigConfig.subs.length; s++) {
+                if (currentSigConfig.subs[s].v === subVal) {
+                    currentSub = currentSigConfig.subs[s];
+                }
+            }
+            if (!currentSub) currentSub = currentSigConfig.subs[0];
+
+            var multiplier = currentSub.m;
+            var stepsPerBar = beatsPerBar * multiplier;
+            globalCachedTotalSteps = stepsPerBar * totalBars; 
+
+            var trackColumnsTemplate = [];
+            trackColumnsTemplate.push('36px'); 
+            
+            for (var b = 0; b < totalBars; b++) {
+                if (b > 0) trackColumnsTemplate.push('36px');
+                for (var bt = 0; bt < beatsPerBar; bt++) {
+                    if (bt > 0) trackColumnsTemplate.push('20px');
+                    for (var s = 0; s < multiplier; s++) {
+                        trackColumnsTemplate.push('minmax(0, 1fr)');
+                    }
+                }
+            }
+            
+            trackColumnsTemplate.push('36px'); 
+            globalCachedGridTemplate = trackColumnsTemplate.join(' ');
+
+            buildGridHeaderElement(totalBars, beatsPerBar, multiplier, globalCachedGridTemplate, sig);
+
+            for (var idx = 0; idx < liveInstrumentsMemory.length; idx++) {
+                appendSingleRowElement(liveInstrumentsMemory[idx], totalBars, beatsPerBar, multiplier, globalCachedGridTemplate);
+            }
+
+            return { sig: sig, multiplier: multiplier, stepsPerBar: stepsPerBar, totalBars: totalBars };
+        }
+
+        function applyContextualRhythm(layoutInfo) {
+            var hihatRow = document.querySelector('.track-row[data-instrument="hihat"]');
+            var snareRow = document.querySelector('.track-row[data-instrument="snare"]');
+            var bassRow  = document.querySelector('.track-row[data-instrument="bass"]');
+            if (!hihatRow || !snareRow || !bassRow) return;
+
+            var mult = layoutInfo.multiplier;
+            var barSteps = layoutInfo.stepsPerBar;
+
+            for (var bar = 0; bar < layoutInfo.totalBars; bar++) {
+                var barOffset = bar * barSteps;
+
+                if (layoutInfo.sig === '4/4') {
+                    for (var b = 0; b < 4; b++) {
+                        var stepIdx = barOffset + (b * mult);
+                        hihatRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
+                        if (b === 0 || b === 2) {
+                            bassRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
+                        }
+                        if (b === 1 || b === 3) {
+                            snareRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
+                        }
+                    }
+                } else if (layoutInfo.sig === '3/4') {
+                    for (var b = 0; b < 3; b++) {
+                        var stepIdx = barOffset + (b * mult);
+                        hihatRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
+                        if (b === 0) {
+                            bassRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
+                        } else {
+                            snareRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
+                        }
+                    }
+                } else if (layoutInfo.sig === '2/4') {
+                    for (var b = 0; b < 2; b++) {
+                        var stepIdx = barOffset + (b * mult);
+                        hihatRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
+                        if (b === 0) {
+                            bassRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
+                        } else {
+                            snareRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
+                        }
+                    }
+                } else if (layoutInfo.sig === '6/8') {
+                    for (var b = 0; b < 6; b++) {
+                        var stepIdx = barOffset + (b * mult);
+                        hihatRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
+                        if (b === 0) {
+                            bassRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
+                        }
+                        if (b === 3) {
+                            snareRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
+                        }
+                    }
+                }
+            }
+        }
+
+        function handleConfigurationLifecycle(loadDefaultRhythm) {
+            var savedNotes = null;
+            if (!loadDefaultRhythm) {
+                savedNotes = extractCurrentNotes();
+            }
+
+            buildNotationGrid();
+
+            if (loadDefaultRhythm) {
+                var currentSigConfig = timeSigConfig[timeSigSelect.value];
+                var currentSub = currentSigConfig.subs.find(function(s) { return s.v === subdivisionSelect.value; }) || currentSigConfig.subs[0];
+                applyContextualRhythm({
+                    sig: timeSigSelect.value,
+                    multiplier: currentSub.m,
+                    stepsPerBar: currentSigConfig.beats * currentSub.m,
+                    totalBars: getSanitizedBarsCount()
+                });
+            } else if (savedNotes) {
+                restoreNotes(savedNotes);
+            }
+        }
+
+        // Intercepts shareable link inputs or defaults to core workspace settings on fresh runtimes
+        function initFromURLOrDefaults() {
+            var params = new URLSearchParams(window.location.search);
+            if (params.has('tracks')) {
+                var titleVal = params.get('title') || "My Drum Groove Composition";
+                var timeVal = params.get('time') || "4/4";
+                var barsVal = params.get('bars') || "2";
+                var subVal = params.get('sub') || "16th";
+                
+                projectTitle.value = titleVal;
+                document.title = titleVal;
+                timeSigSelect.value = timeVal;
+                barsSelect.value = barsVal;
+                
+                var options = timeSigConfig[timeVal].subs;
+                subdivisionSelect.innerHTML = '';
+                for (var i = 0; i < options.length; i++) {
+                    var opt = document.createElement('option');
+                    opt.value = options[i].v;
+                    opt.textContent = options[i].l;
+                    subdivisionSelect.appendChild(opt);
+                }
+                subdivisionSelect.value = subVal;
+
+                try {
+                    var parsedTracks = JSON.parse(params.get('tracks'));
+                    liveInstrumentsMemory = [];
+                    var savedData = {};
+                    
+                    for (var i = 0; i < parsedTracks.length; i++) {
+                        var t = parsedTracks[i];
+                        liveInstrumentsMemory.push({
+                            id: t.id,
+                            defaultName: t.name,
+                            symbol: t.sym
+                        });
+                        savedData[t.id] = t.notes || [];
+                    }
+                    
+                    buildNotationGrid();
+                    restoreNotes(savedData);
+                } catch (e) {
+                    console.error("Failed to parse tracks payload from parameter inputs", e);
+                    updateSubdivisionDropdown();
+                    handleConfigurationLifecycle(true);
+                }
+            } else {
+                document.title = projectTitle.value;
+                updateSubdivisionDropdown();
+                handleConfigurationLifecycle(true);
+            }
+        }
+
+        // --- Event Listeners ---
+        projectTitle.oninput = function() {
+            document.title = this.value;
+            updateURL();
+        };
+
+        timeSigSelect.onchange = function() {
+            updateSubdivisionDropdown();
+            handleConfigurationLifecycle(true);
+            updateURL();
+        };
+
+        barsSelect.oninput = function() {
+            handleConfigurationLifecycle(false); 
+            updateURL();
+        };
+
+        subdivisionSelect.onchange = function() {
+            handleConfigurationLifecycle(true);
+            updateURL();
+        };
+
+        addTrackBtn.onclick = function() {
+            var sig = timeSigSelect.value;
+            var currentSigConfig = timeSigConfig[sig];
+            var totalBars = getSanitizedBarsCount();
+            var subVal = subdivisionSelect.value;
+            
+            var currentSub = null;
+            for (var s = 0; s < currentSigConfig.subs.length; s++) {
+                if (currentSigConfig.subs[s].v === subVal) currentSub = currentSigConfig.subs[s];
+            }
+            if (!currentSub) currentSub = currentSigConfig.subs[0];
+            
+            var uniqueTrackId = "track_" + new Date().getTime();
+            var newTrackObject = { id: uniqueTrackId, defaultName: "new track", symbol: "circle" };
+            liveInstrumentsMemory.push(newTrackObject);
+
+            appendSingleRowElement(
+                newTrackObject, 
+                totalBars, 
+                currentSigConfig.beats, 
+                currentSub.m, 
+                globalCachedGridTemplate
+            );
+            updateURL();
+        };
+
+        document.getElementById('clearBtn').onclick = function() {
+            var allSteps = document.querySelectorAll('.step');
+            for (var i = 0; i < allSteps.length; i++) {
+                allSteps[i].classList.remove('active');
+            }
+            updateURL();
+        };
+
+        var themeBtn = document.getElementById('themeBtn');
+        themeBtn.onclick = function() {
+            document.body.classList.toggle('light-mode');
+        };
+
+        // Initialize App Runtime
+        initFromURLOrDefaults();
+    </script>
+</body>
+</html>
