@@ -323,8 +323,10 @@
             background-color: var(--step-hover);
         }
 
-        /* Active Note Toggle State: Center vector files directly inside the physical frame layouts */
-        .step.active {
+        /* Active Note Toggle States: Center files directly inside the physical frame layouts */
+        .step.active, .step.hand-R, .step.hand-L {
+            border-color: transparent !important;
+            background-color: transparent !important;
             background-repeat: no-repeat;
             background-position: center;
             background-size: 65%;
@@ -337,6 +339,16 @@
         .track-row.sym-cross .step.active {
             background-image: var(--svg-cross);
         }
+
+        /* Handedness Pseudo Notation Layering */
+        .step.hand-R::after, .step.hand-L::after {
+            font-size: 15px;
+            font-weight: bold;
+            color: var(--text-color);
+            line-height: 1;
+        }
+        .step.hand-R::after { content: 'R'; }
+        .step.hand-L::after { content: 'L'; }
 
         /* Dedicated Channel Spacers & Unified Measure Barlines */
         .gap-beat-space { min-width: 0; }
@@ -505,7 +517,7 @@
             }
 
             /* Lock container bounds to keep box proportions identical to empty cell blocks */
-            .step.active {
+            .step.active, .step.hand-R, .step.hand-L {
                 background-color: transparent !important; 
                 border-color: #d0d0d0 !important;
                 background-repeat: no-repeat !important;
@@ -520,6 +532,11 @@
 
             .track-row.sym-cross .step.active {
                 background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%23000000' stroke-width='3.5' stroke-linecap='round' d='M4,4 L20,20 M20,4 L4,20'/%3E%3C/svg%3E") !important;
+            }
+
+            .step.hand-R::after, .step.hand-L::after {
+                color: #000000 !important;
+                font-size: 13px !important;
             }
 
             .gap-bar-line::before {
@@ -642,7 +659,7 @@
             window.history.replaceState({ path: newUrl }, '', newUrl);
         }
 
-        // Extracts all active indices from DOM grouped by instrument ID
+        // Extracts all structural active marks from DOM rows, saving index + short state keys
         function extractCurrentNotes() {
             var savedData = {};
             var rows = document.querySelectorAll('.track-row:not(.header-row)');
@@ -650,32 +667,43 @@
                 var row = rows[r];
                 var instId = row.getAttribute('data-instrument');
                 var steps = row.querySelectorAll('.step');
-                var activeIndices = [];
+                var activeNotes = [];
                 for (var s = 0; s < steps.length; s++) {
                     var step = steps[s];
                     var stepIdx = parseInt(step.getAttribute('data-step'), 10);
                     if (step.classList.contains('active')) {
-                        activeIndices.push(stepIdx);
+                        activeNotes.push({i: stepIdx, s: 'A'});
+                    } else if (step.classList.contains('hand-R')) {
+                        activeNotes.push({i: stepIdx, s: 'R'});
+                    } else if (step.classList.contains('hand-L')) {
+                        activeNotes.push({i: stepIdx, s: 'L'});
                     }
                 }
-                savedData[instId] = activeIndices;
+                savedData[instId] = activeNotes;
             }
             return savedData;
         }
 
-        // Restores calculated active classes to matching steps inside DOM tracking rows
+        // Restores calculated active state tokens, preserving total historical link compatibility
         function restoreNotes(savedData) {
             var rows = document.querySelectorAll('.track-row:not(.header-row)');
             for (var r = 0; r < rows.length; r++) {
                 var row = rows[r];
                 var instId = row.getAttribute('data-instrument');
                 if (savedData[instId]) {
-                    var activeIndices = savedData[instId];
-                    for (var a = 0; a < activeIndices.length; a++) {
-                        var stepIdx = activeIndices[a];
+                    var activeNotes = savedData[instId];
+                    for (var a = 0; a < activeNotes.length; a++) {
+                        var note = activeNotes[a];
+                        
+                        // Smart Capture: Supports legacy straight integer index arrays from older versions
+                        var stepIdx = (typeof note === 'object') ? note.i : note;
+                        var stateType = (typeof note === 'object') ? note.s : 'A';
+                        
                         var step = row.querySelector('[data-step="' + stepIdx + '"]');
                         if (step) {
-                            step.classList.add('active');
+                            if (stateType === 'A') step.classList.add('active');
+                            else if (stateType === 'R') step.classList.add('hand-R');
+                            else if (stateType === 'L') step.classList.add('hand-L');
                         }
                     }
                 }
@@ -702,10 +730,15 @@
                     var targetBox = currentRow.querySelector('[data-step="' + (targetOffset + i) + '"]');
                     
                     if (sourceBox && targetBox) {
+                        // Reset target states completely before cloning values
+                        targetBox.classList.remove('active', 'hand-R', 'hand-L');
+                        
                         if (sourceBox.classList.contains('active')) {
                             targetBox.classList.add('active');
-                        } else {
-                            targetBox.classList.remove('active');
+                        } else if (sourceBox.classList.contains('hand-R')) {
+                            targetBox.classList.add('hand-R');
+                        } else if (sourceBox.classList.contains('hand-L')) {
+                            targetBox.classList.add('hand-L');
                         }
                     }
                 }
@@ -731,20 +764,20 @@
 
             for (var instId in savedNotes) {
                 if (savedNotes.hasOwnProperty(instId)) {
-                    var oldIndices = savedNotes[instId];
-                    var newIndices = [];
+                    var oldNotes = savedNotes[instId];
+                    var newNotesList = [];
 
-                    for (var i = 0; i < oldIndices.length; i++) {
-                        var idx = oldIndices[i];
-                        if (idx >= startDelIdx && idx < endDelIdx) {
+                    for (var i = 0; i < oldNotes.length; i++) {
+                        var note = oldNotes[i];
+                        if (note.i >= startDelIdx && note.i < endDelIdx) {
                             continue; 
-                        } else if (idx >= endDelIdx) {
-                            newIndices.push(idx - stepsPerBar); 
+                        } else if (note.i >= endDelIdx) {
+                            newNotesList.push({i: note.i - stepsPerBar, s: note.s}); 
                         } else {
-                            newIndices.push(idx); 
+                            newNotesList.push({i: note.i, s: note.s}); 
                         }
                     }
-                    newNotes[instId] = newIndices;
+                    newNotes[instId] = newNotesList;
                 }
             }
 
@@ -769,28 +802,28 @@
 
             for (var instId in savedNotes) {
                 if (savedNotes.hasOwnProperty(instId)) {
-                    var oldIndices = savedNotes[instId];
-                    var newIndices = [];
+                    var oldNotes = savedNotes[instId];
+                    var newNotesList = [];
 
                     if (type === 'start') {
-                        for (var i = 0; i < oldIndices.length; i++) {
-                            var oldIdx = oldIndices[i];
-                            newIndices.push(oldIdx + stepsPerBar); 
-                            if (oldIdx < stepsPerBar) {
-                                newIndices.push(oldIdx); 
+                        for (var i = 0; i < oldNotes.length; i++) {
+                            var note = oldNotes[i];
+                            newNotesList.push({i: note.i + stepsPerBar, s: note.s}); 
+                            if (note.i < stepsPerBar) {
+                                newNotesList.push({i: note.i, s: note.s}); 
                             }
                         }
                     } else if (type === 'end') {
                         var lastBarStartIdx = (currentBars - 1) * stepsPerBar;
-                        for (var i = 0; i < oldIndices.length; i++) {
-                            var oldIdx = oldIndices[i];
-                            newIndices.push(oldIdx); 
-                            if (oldIdx >= lastBarStartIdx) {
-                                newIndices.push(oldIdx + stepsPerBar); 
+                        for (var i = 0; i < oldNotes.length; i++) {
+                            var note = oldNotes[i];
+                            newNotesList.push({i: note.i, s: note.s}); 
+                            if (note.i >= lastBarStartIdx) {
+                                newNotesList.push({i: note.i + stepsPerBar, s: note.s}); 
                             }
                         }
                     }
-                    newNotes[instId] = newIndices;
+                    newNotes[instId] = newNotesList;
                 }
             }
 
@@ -1054,8 +1087,19 @@
                         step.classList.add('step');
                         step.setAttribute('data-step', globalStepIndex);
 
+                        // State-Machine Engine: Cycles cleanly across 4 logical click vectors
                         step.onclick = function() {
-                            this.classList.toggle('active');
+                            if (this.classList.contains('active')) {
+                                this.classList.remove('active');
+                                this.classList.add('hand-R');
+                            } else if (this.classList.contains('hand-R')) {
+                                this.classList.remove('hand-R');
+                                this.classList.add('hand-L');
+                            } else if (this.classList.contains('hand-L')) {
+                                this.classList.remove('hand-L');
+                            } else {
+                                this.classList.add('active');
+                            }
                             updateURL();
                         };
 
@@ -1304,7 +1348,7 @@
         document.getElementById('clearBtn').onclick = function() {
             var allSteps = document.querySelectorAll('.step');
             for (var i = 0; i < allSteps.length; i++) {
-                allSteps[i].classList.remove('active');
+                allSteps[i].classList.remove('active', 'hand-R', 'hand-L');
             }
             updateURL();
         };
