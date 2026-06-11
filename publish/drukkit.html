@@ -433,6 +433,44 @@
             border-color: #ff2e63;
         }
 
+        /* Composition Remarks Pad Styling */
+        .notes-container {
+            margin-top: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .notes-label {
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent-color);
+            padding-left: 2px;
+        }
+
+        #compositionNotes {
+            width: 100%;
+            min-height: 110px;
+            background-color: var(--panel-bg);
+            color: var(--text-color);
+            border: 1px solid var(--step-border);
+            padding: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+            border-radius: 6px;
+            outline: none;
+            resize: vertical;
+            font-family: sans-serif;
+            transition: border-color 0.2s;
+        }
+
+        #compositionNotes:focus {
+            border-color: var(--accent-color);
+        }
+
         /* ==========================================================================
            🖨️ HARD SAFETY PRINT-MODE CONFIGURATION STYLES
            ========================================================================== */
@@ -550,6 +588,25 @@
                 top: -16px !important;
                 bottom: -16px !important;
             }
+
+            /* Remarks Layout Printing Optimization */
+            .notes-container {
+                margin-top: 30px !important;
+                page-break-inside: avoid !important;
+            }
+
+            .notes-label {
+                color: #000000 !important;
+            }
+
+            #compositionNotes {
+                background-color: transparent !important;
+                color: #000000 !important;
+                border: 1px solid #d0d0d0 !important;
+                resize: none !important;
+                overflow: visible !important;
+                height: auto !important;
+            }
         }
     </style>
 </head>
@@ -590,6 +647,11 @@
     <div class="notation-container">
         <div class="notation-grid-wrapper" id="notationGrid"></div>
         <button class="add-btn" id="addTrackBtn">+ Add Track</button>
+        
+        <div class="notes-container">
+            <div class="notes-label">Notes / Performance Remarks</div>
+            <textarea id="compositionNotes" placeholder="Add custom stick-control maps, rudiment hints, dynamic changes, or practice logs here..."></textarea>
+        </div>
     </div>
 
     <script>
@@ -612,6 +674,7 @@
         var subdivisionSelect = document.getElementById('subdivisionSelect');
         var addTrackBtn = document.getElementById('addTrackBtn');
         var projectTitle = document.getElementById('projectTitle');
+        var compositionNotes = document.getElementById('compositionNotes');
 
         var globalCachedGridTemplate = "";
         var globalCachedTotalSteps = 0;
@@ -642,6 +705,7 @@
             var timeVal = timeSigSelect.value;
             var barsVal = barsSelect.value;
             var subVal = subdivisionSelect.value;
+            var notesVal = compositionNotes.value;
             
             var savedNotes = extractCurrentNotes(); 
             var tracksPayload = liveInstrumentsMemory.map(function(inst) {
@@ -658,6 +722,7 @@
             params.set('time', timeVal);
             params.set('bars', barsVal);
             params.set('sub', subVal);
+            params.set('notes', notesVal);
             params.set('tracks', JSON.stringify(tracksPayload));
 
             var newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?' + params.toString();
@@ -1257,11 +1322,13 @@
                 var timeVal = params.get('time') || "4/4";
                 var barsVal = params.get('bars') || "2";
                 var subVal = params.get('sub') || "16th";
+                var notesVal = params.get('notes') || "";
                 
                 projectTitle.value = titleVal;
                 document.title = titleVal;
                 timeSigSelect.value = timeVal;
                 barsSelect.value = barsVal;
+                compositionNotes.value = notesVal;
                 
                 var options = timeSigConfig[timeVal].subs;
                 subdivisionSelect.innerHTML = '';
@@ -1297,6 +1364,7 @@
                 }
             } else {
                 document.title = projectTitle.value;
+                compositionNotes.value = "";
                 updateSubdivisionDropdown();
                 handleConfigurationLifecycle(true);
             }
@@ -1305,6 +1373,10 @@
         // --- Event Listeners ---
         projectTitle.oninput = function() {
             document.title = this.value;
+            updateURL();
+        };
+
+        compositionNotes.oninput = function() {
             updateURL();
         };
 
