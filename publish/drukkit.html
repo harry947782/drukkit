@@ -471,6 +471,67 @@
             border-color: var(--accent-color);
         }
 
+        /* Embedded Schema Container Component */
+        .schema-container {
+            margin-top: 12px;
+            width: 100%;
+        }
+
+        .schema-accordion {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--step-border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .schema-summary {
+            padding: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            cursor: pointer;
+            user-select: none;
+            outline: none;
+            transition: color 0.2s;
+        }
+
+        .schema-summary:hover {
+            color: var(--accent-color);
+        }
+
+        .schema-content {
+            padding: 0 12px 12px 12px;
+            border-top: 1px solid var(--step-border);
+            background-color: rgba(0, 0, 0, 0.15);
+        }
+
+        .schema-desc {
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--text-color);
+            margin: 12px 0 8px 0;
+        }
+
+        .schema-code-block {
+            background-color: #0c0c0c;
+            color: #a9ffb3;
+            padding: 14px;
+            font-family: monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            border: 1px solid #1a1a1a;
+        }
+
+        /* Offline-Safe Print Metadata QR Target */
+        .print-qr-container {
+            display: none;
+        }
+
         /* ==========================================================================
            🖨️ HARD SAFETY PRINT-MODE CONFIGURATION STYLES
            ========================================================================== */
@@ -498,14 +559,31 @@
                 background-color: #ffffff !important;
                 border-bottom: 2px solid #000000 !important;
                 padding: 10px 0 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: space-between !important;
             }
 
             .controls,
             .delete-track-btn,
             .symbol-select,
             .bar-copy-menu,
+            .schema-container,
             #addTrackBtn {
                 display: none !important;
+            }
+
+            /* Mount interactive QR code container directly opposite sheet music labels */
+            .print-qr-container {
+                display: block !important;
+                width: 90px !important;
+                height: 90px !important;
+                flex-shrink: 0 !important;
+            }
+
+            .print-qr-container img {
+                width: 100% !important;
+                height: 100% !important;
             }
 
             .notation-container {
@@ -642,6 +720,10 @@
             <button class="theme-btn" id="themeBtn">Theme</button>
             <button class="clear-btn" id="clearBtn">Clear</button>
         </div>
+
+        <div class="print-qr-container">
+            <img id="printQrCode" src="" alt="Drukkit Layout Save Code">
+        </div>
     </header>
 
     <div class="notation-container">
@@ -651,6 +733,48 @@
         <div class="notes-container">
             <div class="notes-label">Notes / Performance Remarks</div>
             <textarea id="compositionNotes" placeholder="Add custom stick-control maps, rudiment hints, dynamic changes, or practice logs here..."></textarea>
+        </div>
+
+        <div class="schema-container">
+            <details class="schema-accordion">
+                <summary class="schema-summary">🤖 AI Transcription Guide & URL Schema</summary>
+                <div class="schema-content">
+                    <p class="schema-desc">Provide the system instructions below to any multimodal LLM (like Gemini) along with a handwritten drum score to generate instantly loading save links:</p>
+                    <pre class="schema-code-block">Analyze the attached image of a handwritten drum score and generate a working shareable link using the current Drukkit specifications:
+
+1. APPLICATION TARGET URL:
+https://harry947782.github.io/drukkit/drukkit.html
+
+2. PARAMETER DEFINITIONS:
+- title: URL-encoded piece title string.
+- time: Time signature token ("4/4", "3/4", "2/4", or "6/8").
+- bars: Int bar count string ("1" to "16").
+- sub: Resolution mode token ("quarter", "8th", "12th", or "16th").
+- notes: URL-encoded copy of any practice logs, annotations, or side-remarks.
+- tracks: URL-encoded JSON structure array containing track objects.
+
+3. TRACK NODE DATA OBJECT STRUCTURE:
+{
+  "id": "unique_string_key",
+  "name": "display_instrument_name",
+  "sym": "circle" or "cross",
+  "notes": [{"i": global_step_index_integer, "s": "state_token_character"}]
+}
+
+4. ACCENT MARK STATE TOKENS ("s"):
+- "A": Standard beat activation mark (dots, solid blocks, generic ticks).
+- "R": Right-hand stroke annotation written over or in place of that beat.
+- "L": Left-hand stroke annotation written over or in place of that beat.
+
+5. MATHEMATHICAL STEP TIMELINE COORDINATES ("i"):
+The step timeline is a single continuous 0-indexed integer axis. Calculate using:
+Steps Per Bar = (Beats Per Bar) * (Subdivision Multiplier)
+Multiplier: quarter=1, 8th=2, 12th (Triplets)=3, 16th=4.
+Formula: Index = (BarIndex * Steps Per Bar) + (BeatIndex * Multiplier) + SubBeatOffset
+
+Output ONLY the final working markdown URL link block. Do not write introductory prose or code explanations.</pre>
+                </div>
+            </details>
         </div>
     </div>
 
@@ -675,6 +799,7 @@
         var addTrackBtn = document.getElementById('addTrackBtn');
         var projectTitle = document.getElementById('projectTitle');
         var compositionNotes = document.getElementById('compositionNotes');
+        var printQrCode = document.getElementById('printQrCode');
 
         var globalCachedGridTemplate = "";
         var globalCachedTotalSteps = 0;
@@ -727,6 +852,11 @@
 
             var newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?' + params.toString();
             window.history.replaceState({ path: newUrl }, '', newUrl);
+
+            // Re-render vector QR parameters dynamically 
+            if (printQrCode) {
+                printQrCode.src = "https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=" + encodeURIComponent(newUrl);
+            }
         }
 
         // Extracts all structural active marks from DOM rows, saving index + short state keys
@@ -1368,6 +1498,9 @@
                 updateSubdivisionDropdown();
                 handleConfigurationLifecycle(true);
             }
+            
+            // Core Fix: Forces QR rendering on original link hydration or bootup cycle
+            updateURL();
         }
 
         // --- Event Listeners ---
