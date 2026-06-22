@@ -289,6 +289,39 @@
             background: rgba(255, 46, 99, 0.1);
         }
 
+        /* Track Row Drag Handle */
+        .drag-handle {
+            cursor: grab;
+            color: var(--text-muted);
+            font-size: 15px;
+            padding: 4px 3px;
+            flex-shrink: 0;
+            user-select: none;
+            line-height: 1;
+            opacity: 0.45;
+            transition: opacity 0.15s;
+        }
+
+        .drag-handle:hover {
+            opacity: 1;
+        }
+
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+
+        .track-row.dragging {
+            opacity: 0.35;
+        }
+
+        .track-row.drag-over-above {
+            box-shadow: 0 -3px 0 var(--accent-color);
+        }
+
+        .track-row.drag-over-below {
+            box-shadow: 0 3px 0 var(--accent-color);
+        }
+
         /* Dynamic Step Grid Layout */
         .grid-steps {
             flex: 1;
@@ -584,6 +617,7 @@
 
             .controls,
             .delete-track-btn,
+            .drag-handle,
             .symbol-select,
             .bar-copy-menu,
             .schema-container,
@@ -825,6 +859,7 @@ Output ONLY the final working markdown URL link block. Do not write introductory
 
         var globalCachedGridTemplate = "";
         var globalCachedTotalSteps = 0;
+        var dragSrcRow = null;
 
         function getSanitizedBarsCount() {
             var val = parseInt(barsSelect.value, 10);
@@ -1245,6 +1280,14 @@ Output ONLY the final working markdown URL link block. Do not write introductory
             var labelCtrls = document.createElement('div');
             labelCtrls.classList.add('label-ctrls');
 
+            var dragHandle = document.createElement('div');
+            dragHandle.classList.add('drag-handle');
+            dragHandle.setAttribute('draggable', 'true');
+            dragHandle.title = 'Drag to reorder';
+            dragHandle.setAttribute('aria-label', 'Drag to reorder track');
+            dragHandle.innerHTML = '&#10303;'; // ⠿ braille grip icon
+            labelCtrls.appendChild(dragHandle);
+
             var symSelect = document.createElement('select');
             symSelect.classList.add('symbol-select');
             
@@ -1290,6 +1333,81 @@ Output ONLY the final working markdown URL link block. Do not write introductory
                 updateURL();
             };
             labelCtrls.appendChild(delBtn);
+
+            // --- Drag-to-reorder wiring ---
+            dragHandle.ondragstart = function(e) {
+                dragSrcRow = row;
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', inst.id);
+                // Use the full row as the drag ghost image
+                var rowRect = row.getBoundingClientRect();
+                e.dataTransfer.setDragImage(row, e.clientX - rowRect.left, e.clientY - rowRect.top);
+                // Defer class addition so the ghost captures the un-faded state
+                requestAnimationFrame(function() { row.classList.add('dragging'); });
+            };
+
+            dragHandle.ondragend = function() {
+                row.classList.remove('dragging');
+                dragSrcRow = null;
+                var allRows = gridContainer.querySelectorAll('.track-row:not(.header-row)');
+                for (var i = 0; i < allRows.length; i++) {
+                    allRows[i].classList.remove('drag-over-above', 'drag-over-below');
+                }
+            };
+
+            row.ondragover = function(e) {
+                if (!dragSrcRow || dragSrcRow === row) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                var rect = row.getBoundingClientRect();
+                row.classList.remove('drag-over-above', 'drag-over-below');
+                if (e.clientY < rect.top + rect.height / 2) {
+                    row.classList.add('drag-over-above');
+                } else {
+                    row.classList.add('drag-over-below');
+                }
+            };
+
+            row.ondragleave = function(e) {
+                // Guard against child-element transitions and null relatedTarget
+                // (null occurs when leaving to browser chrome, viewport edge, or non-DOM regions)
+                if (!e.relatedTarget || row.contains(e.relatedTarget)) return;
+                row.classList.remove('drag-over-above', 'drag-over-below');
+            };
+
+            row.ondrop = function(e) {
+                if (!dragSrcRow || dragSrcRow === row) return;
+                e.preventDefault();
+                var insertAbove = row.classList.contains('drag-over-above');
+                row.classList.remove('drag-over-above', 'drag-over-below');
+
+                if (insertAbove) {
+                    gridContainer.insertBefore(dragSrcRow, row);
+                } else {
+                    var nextSib = row.nextSibling;
+                    if (nextSib) {
+                        gridContainer.insertBefore(dragSrcRow, nextSib);
+                    } else {
+                        gridContainer.appendChild(dragSrcRow);
+                    }
+                }
+
+                // Re-sync liveInstrumentsMemory to reflect the new DOM order
+                var instMap = {};
+                for (var m = 0; m < liveInstrumentsMemory.length; m++) {
+                    instMap[liveInstrumentsMemory[m].id] = liveInstrumentsMemory[m];
+                }
+                var newOrder = [];
+                var reorderedRows = gridContainer.querySelectorAll('.track-row:not(.header-row)');
+                for (var r = 0; r < reorderedRows.length; r++) {
+                    var rowId = reorderedRows[r].getAttribute('data-instrument');
+                    if (instMap[rowId]) newOrder.push(instMap[rowId]);
+                }
+                liveInstrumentsMemory = newOrder;
+                updateURL();
+            };
+            // --- End drag-to-reorder wiring ---
+
             row.appendChild(labelCtrls);
 
             var stepsContainer = document.createElement('div');
