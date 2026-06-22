@@ -1320,9 +1320,15 @@ Output ONLY the final working markdown URL link block. Do not write introductory
                         step.classList.add('step');
                         step.setAttribute('data-step', globalStepIndex);
 
-                        // State-Machine Engine: Cycles cleanly across 4 logical click vectors
-                        step.onclick = function() {
-                            if (this.classList.contains('active')) {
+                        // State-Machine Engine: Cycles cleanly across 4 logical click vectors.
+                        // Tapping the top 30% of an active cell toggles the accent mark (mobile-friendly
+                        // alternative to right-click for touch devices that lack a secondary tap).
+                        step.onclick = function(e) {
+                            var isTopZone = (e.offsetY / this.offsetHeight) < 0.30;
+                            var hasSymbol = this.classList.contains('active') || this.classList.contains('hand-R') || this.classList.contains('hand-L');
+                            if (isTopZone && hasSymbol) {
+                                this.classList.toggle('accent');
+                            } else if (this.classList.contains('active')) {
                                 this.classList.remove('active');
                                 this.classList.add('hand-R');
                             } else if (this.classList.contains('hand-R')) {
@@ -1336,7 +1342,7 @@ Output ONLY the final working markdown URL link block. Do not write introductory
                             updateURL();
                         };
 
-                        // Accent Toggle: Right-click adds/removes accent mark on active notes
+                        // Accent Toggle: Right-click adds/removes accent mark on active notes (desktop)
                         step.oncontextmenu = function(e) {
                             e.preventDefault();
                             if (this.classList.contains('active') || this.classList.contains('hand-R') || this.classList.contains('hand-L')) {
