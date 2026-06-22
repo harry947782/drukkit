@@ -893,12 +893,19 @@ Output ONLY the final working markdown URL link block. Do not write introductory
                 for (var s = 0; s < steps.length; s++) {
                     var step = steps[s];
                     var stepIdx = parseInt(step.getAttribute('data-step'), 10);
+                    var isAccented = step.classList.contains('accent');
                     if (step.classList.contains('active')) {
-                        activeNotes.push({i: stepIdx, s: 'A', a: step.classList.contains('accent') ? 1 : undefined});
+                        var noteObj = {i: stepIdx, s: 'A'};
+                        if (isAccented) noteObj.a = 1;
+                        activeNotes.push(noteObj);
                     } else if (step.classList.contains('hand-R')) {
-                        activeNotes.push({i: stepIdx, s: 'R', a: step.classList.contains('accent') ? 1 : undefined});
+                        var noteObj = {i: stepIdx, s: 'R'};
+                        if (isAccented) noteObj.a = 1;
+                        activeNotes.push(noteObj);
                     } else if (step.classList.contains('hand-L')) {
-                        activeNotes.push({i: stepIdx, s: 'L', a: step.classList.contains('accent') ? 1 : undefined});
+                        var noteObj = {i: stepIdx, s: 'L'};
+                        if (isAccented) noteObj.a = 1;
+                        activeNotes.push(noteObj);
                     }
                 }
                 savedData[instId] = activeNotes;
