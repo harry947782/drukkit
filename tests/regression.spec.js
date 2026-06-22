@@ -7,7 +7,7 @@ async function gotoApp(page, search = '') {
 }
 
 async function clearGrid(page) {
-  await page.getByRole('button', { name: 'Clear All Notes' }).click();
+  await page.getByRole('button', { name: 'Clear' }).click();
 }
 
 function stepSelector(trackId, stepIndex) {
@@ -15,10 +15,25 @@ function stepSelector(trackId, stepIndex) {
 }
 
 async function clickStep(page, trackId, stepIndex, options = {}) {
-  await page.locator(stepSelector(trackId, stepIndex)).click({
-    position: options.position || { x: 12, y: 28 },
-    button: options.button || 'left'
-  });
+  const position = options.position || { x: 12, y: 28 };
+  const button = options.button || 'left';
+  await page.locator(stepSelector(trackId, stepIndex)).evaluate((step, payload) => {
+    const type = payload.button === 'right' ? 'contextmenu' : 'click';
+    const event = new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      button: payload.button === 'right' ? 2 : 0
+    });
+    Object.defineProperty(event, 'offsetY', {
+      configurable: true,
+      get: () => payload.position.y
+    });
+    Object.defineProperty(event, 'offsetX', {
+      configurable: true,
+      get: () => payload.position.x
+    });
+    step.dispatchEvent(event);
+  }, { button, position });
 }
 
 async function stepClasses(page, trackId, stepIndex) {
@@ -50,7 +65,7 @@ test('loads the default groove and share state', async ({ page }) => {
   await expect(page.locator('#barsSelect')).toHaveValue('2');
   await expect(page.locator('#subdivisionSelect')).toHaveValue('16th');
 
-  await expect(await activeSteps(page, 'hihat')).toEqual([
+  expect(await activeSteps(page, 'hihat')).toEqual([
     { index: 0, state: 'A', accent: false },
     { index: 4, state: 'A', accent: false },
     { index: 8, state: 'A', accent: false },
@@ -60,13 +75,13 @@ test('loads the default groove and share state', async ({ page }) => {
     { index: 24, state: 'A', accent: false },
     { index: 28, state: 'A', accent: false }
   ]);
-  await expect(await activeSteps(page, 'snare')).toEqual([
+  expect(await activeSteps(page, 'snare')).toEqual([
     { index: 4, state: 'A', accent: false },
     { index: 12, state: 'A', accent: false },
     { index: 20, state: 'A', accent: false },
     { index: 28, state: 'A', accent: false }
   ]);
-  await expect(await activeSteps(page, 'bass')).toEqual([
+  expect(await activeSteps(page, 'bass')).toEqual([
     { index: 0, state: 'A', accent: false },
     { index: 8, state: 'A', accent: false },
     { index: 16, state: 'A', accent: false },
@@ -91,22 +106,22 @@ test('cycles note states and toggles accents without losing hand annotations', a
   await clearGrid(page);
 
   await clickStep(page, 'hihat', 1);
-  await expect(await stepClasses(page, 'hihat', 1)).toEqual({ active: true, right: false, left: false, accent: false });
+  expect(await stepClasses(page, 'hihat', 1)).toEqual({ active: true, right: false, left: false, accent: false });
 
   await clickStep(page, 'hihat', 1, { button: 'right' });
-  await expect(await stepClasses(page, 'hihat', 1)).toEqual({ active: true, right: false, left: false, accent: true });
+  expect(await stepClasses(page, 'hihat', 1)).toEqual({ active: true, right: false, left: false, accent: true });
 
   await clickStep(page, 'hihat', 1);
-  await expect(await stepClasses(page, 'hihat', 1)).toEqual({ active: false, right: true, left: false, accent: true });
+  expect(await stepClasses(page, 'hihat', 1)).toEqual({ active: false, right: true, left: false, accent: true });
 
   await clickStep(page, 'hihat', 1, { position: { x: 12, y: 3 } });
-  await expect(await stepClasses(page, 'hihat', 1)).toEqual({ active: false, right: true, left: false, accent: false });
+  expect(await stepClasses(page, 'hihat', 1)).toEqual({ active: false, right: true, left: false, accent: false });
 
   await clickStep(page, 'hihat', 1);
-  await expect(await stepClasses(page, 'hihat', 1)).toEqual({ active: false, right: false, left: true, accent: false });
+  expect(await stepClasses(page, 'hihat', 1)).toEqual({ active: false, right: false, left: true, accent: false });
 
   await clickStep(page, 'hihat', 1);
-  await expect(await stepClasses(page, 'hihat', 1)).toEqual({ active: false, right: false, left: false, accent: false });
+  expect(await stepClasses(page, 'hihat', 1)).toEqual({ active: false, right: false, left: false, accent: false });
 });
 
 test('serializes custom edits into the URL and restores them on reload', async ({ page }) => {
@@ -135,9 +150,9 @@ test('serializes custom edits into the URL and restores them on reload', async (
     };
   });
 
-  await expect(serialized.title).toBe('Linear Fusion');
-  await expect(serialized.notes).toBe('Practice with alternating accents');
-  await expect(serialized.tracks.find((track) => track.id === 'snare')).toEqual({
+  expect(serialized.title).toBe('Linear Fusion');
+  expect(serialized.notes).toBe('Practice with alternating accents');
+  expect(serialized.tracks.find((track) => track.id === 'snare')).toEqual({
     id: 'snare',
     name: 'backbeat',
     sym: 'cross',
@@ -146,7 +161,7 @@ test('serializes custom edits into the URL and restores them on reload', async (
       { i: 3, s: 'R' }
     ]
   });
-  await expect(serialized.tracks.find((track) => track.id === 'bass')).toEqual({
+  expect(serialized.tracks.find((track) => track.id === 'bass')).toEqual({
     id: 'bass',
     name: 'bass',
     sym: 'circle',
@@ -162,9 +177,9 @@ test('serializes custom edits into the URL and restores them on reload', async (
   await expect(page.locator('#compositionNotes')).toHaveValue('Practice with alternating accents');
   await expect(page.locator('.track-row[data-instrument="snare"] .instrument-label-input')).toHaveValue('backbeat');
   await expect(page.locator('.track-row[data-instrument="snare"] .symbol-select')).toHaveValue('cross');
-  await expect(await stepClasses(page, 'snare', 2)).toEqual({ active: true, right: false, left: false, accent: true });
-  await expect(await stepClasses(page, 'snare', 3)).toEqual({ active: false, right: true, left: false, accent: false });
-  await expect(await stepClasses(page, 'bass', 7)).toEqual({ active: false, right: false, left: true, accent: false });
+  expect(await stepClasses(page, 'snare', 2)).toEqual({ active: true, right: false, left: false, accent: true });
+  expect(await stepClasses(page, 'snare', 3)).toEqual({ active: false, right: true, left: false, accent: false });
+  expect(await stepClasses(page, 'bass', 7)).toEqual({ active: false, right: false, left: true, accent: false });
 });
 
 test('restores legacy integer note arrays as active notes', async ({ page }) => {
@@ -183,8 +198,8 @@ test('restores legacy integer note arrays as active notes', async ({ page }) => 
 
   await gotoApp(page, `?${params.toString()}`);
 
-  await expect(await stepClasses(page, 'hihat', 0)).toEqual({ active: true, right: false, left: false, accent: false });
-  await expect(await stepClasses(page, 'hihat', 5)).toEqual({ active: true, right: false, left: false, accent: false });
+  expect(await stepClasses(page, 'hihat', 0)).toEqual({ active: true, right: false, left: false, accent: false });
+  expect(await stepClasses(page, 'hihat', 5)).toEqual({ active: true, right: false, left: false, accent: false });
 });
 
 test('copies bars with hand states and accents intact', async ({ page }) => {
@@ -201,9 +216,9 @@ test('copies bars with hand states and accents intact', async ({ page }) => {
 
   await page.evaluate(() => executeBarCopy(0, 1));
 
-  await expect(await stepClasses(page, 'hihat', 16)).toEqual({ active: true, right: false, left: false, accent: true });
-  await expect(await stepClasses(page, 'hihat', 17)).toEqual({ active: false, right: true, left: false, accent: false });
-  await expect(await stepClasses(page, 'snare', 18)).toEqual({ active: false, right: false, left: true, accent: false });
+  expect(await stepClasses(page, 'hihat', 16)).toEqual({ active: true, right: false, left: false, accent: true });
+  expect(await stepClasses(page, 'hihat', 17)).toEqual({ active: false, right: true, left: false, accent: false });
+  expect(await stepClasses(page, 'snare', 18)).toEqual({ active: false, right: false, left: true, accent: false });
 });
 
 test('deletes bars and shifts later notes left', async ({ page }) => {
@@ -218,9 +233,9 @@ test('deletes bars and shifts later notes left', async ({ page }) => {
   await page.evaluate(() => executeBarDeletion(0));
 
   await expect(page.locator('#barsSelect')).toHaveValue('2');
-  await expect(await stepClasses(page, 'hihat', 2)).toEqual({ active: true, right: false, left: false, accent: false });
-  await expect(await stepClasses(page, 'snare', 17)).toEqual({ active: false, right: true, left: false, accent: false });
-  await expect(await stepClasses(page, 'hihat', 18)).toEqual({ active: false, right: false, left: false, accent: false });
+  expect(await stepClasses(page, 'hihat', 2)).toEqual({ active: true, right: false, left: false, accent: false });
+  expect(await stepClasses(page, 'snare', 17)).toEqual({ active: false, right: true, left: false, accent: false });
+  expect(await stepClasses(page, 'hihat', 18)).toEqual({ active: false, right: false, left: false, accent: false });
 });
 
 test('duplicates the first bar when extending from the start boundary', async ({ page }) => {
@@ -234,10 +249,10 @@ test('duplicates the first bar when extending from the start boundary', async ({
   await page.evaluate(() => executeOuterBarAddition('start'));
 
   await expect(page.locator('#barsSelect')).toHaveValue('3');
-  await expect(await stepClasses(page, 'hihat', 1)).toEqual({ active: true, right: false, left: false, accent: false });
-  await expect(await stepClasses(page, 'hihat', 17)).toEqual({ active: true, right: false, left: false, accent: false });
-  await expect(await stepClasses(page, 'snare', 3)).toEqual({ active: false, right: true, left: false, accent: false });
-  await expect(await stepClasses(page, 'snare', 19)).toEqual({ active: false, right: true, left: false, accent: false });
+  expect(await stepClasses(page, 'hihat', 1)).toEqual({ active: true, right: false, left: false, accent: false });
+  expect(await stepClasses(page, 'hihat', 17)).toEqual({ active: true, right: false, left: false, accent: false });
+  expect(await stepClasses(page, 'snare', 3)).toEqual({ active: false, right: true, left: false, accent: false });
+  expect(await stepClasses(page, 'snare', 19)).toEqual({ active: false, right: true, left: false, accent: false });
 });
 
 test('hides delete controls when the chart has only one bar', async ({ page }) => {
