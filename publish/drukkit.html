@@ -650,6 +650,7 @@
                 background-color: transparent !important; 
                 border: 1px solid #d0d0d0 !important; 
                 border-radius: 2px !important;
+                overflow: visible !important;
             }
 
             /* Lock container bounds to keep box proportions identical to empty cell blocks */
@@ -681,8 +682,11 @@
             /* Force crisp black accent mark regardless of active theme */
             .step.accent::after {
                 background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath stroke='%23000000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' fill='none' d='M2,1 L22,7 L2,13'/%3E%3C/svg%3E") !important;
-                top: 8% !important;
-                height: 18% !important;
+                top: auto !important;
+                bottom: 100% !important;
+                margin-bottom: 2px !important;
+                width: 65% !important;
+                height: 24% !important;
             }
 
             .gap-bar-line::before {
