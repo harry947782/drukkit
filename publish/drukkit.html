@@ -36,6 +36,7 @@
             --svg-cross: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%23ffffff' stroke-width='3.5' stroke-linecap='round' d='M4,4 L20,20 M20,4 L4,20'/%3E%3C/svg%3E");
             --svg-letter-r: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext x='12' y='12' font-family='sans-serif' font-weight='bold' font-size='18' fill='%23ffffff' text-anchor='middle' dominant-baseline='central'%3ER%3C/text%3E%3C/svg%3E");
             --svg-letter-l: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext x='12' y='12' font-family='sans-serif' font-weight='bold' font-size='18' fill='%23ffffff' text-anchor='middle' dominant-baseline='central'%3EL%3C/text%3E%3C/svg%3E");
+            --svg-accent: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' fill='none' d='M2,1 L22,7 L2,13'/%3E%3C/svg%3E");
         }
 
         body.light-mode {
@@ -62,6 +63,7 @@
             --svg-cross: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%231a1a1a' stroke-width='3.5' stroke-linecap='round' d='M4,4 L20,20 M20,4 L4,20'/%3E%3C/svg%3E");
             --svg-letter-r: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext x='12' y='12' font-family='sans-serif' font-weight='bold' font-size='18' fill='%231a1a1a' text-anchor='middle' dominant-baseline='central'%3ER%3C/text%3E%3C/svg%3E");
             --svg-letter-l: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext x='12' y='12' font-family='sans-serif' font-weight='bold' font-size='18' fill='%231a1a1a' text-anchor='middle' dominant-baseline='central'%3EL%3C/text%3E%3C/svg%3E");
+            --svg-accent: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath stroke='%231a1a1a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' fill='none' d='M2,1 L22,7 L2,13'/%3E%3C/svg%3E");
         }
 
         * {
@@ -350,6 +352,22 @@
 
         .step.hand-L {
             background-image: var(--svg-letter-l);
+        }
+
+        /* Accent Mark: squashed > overlay displayed above the primary symbol */
+        .step.accent::after {
+            content: '';
+            position: absolute;
+            top: -3%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 55%;
+            height: 22%;
+            background-image: var(--svg-accent);
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: contain;
+            pointer-events: none;
         }
 
         /* Dedicated Channel Spacers & Unified Measure Barlines */
@@ -758,13 +776,17 @@ https://harry947782.github.io/drukkit/drukkit.html
   "id": "unique_string_key",
   "name": "display_instrument_name",
   "sym": "circle" or "cross",
-  "notes": [{"i": global_step_index_integer, "s": "state_token_character"}]
+  "notes": [{"i": global_step_index_integer, "s": "state_token_character", "a": 1_or_omitted}]
 }
 
-4. ACCENT MARK STATE TOKENS ("s"):
+4. BEAT STATE TOKENS ("s"):
 - "A": Standard beat activation mark (dots, solid blocks, generic ticks).
 - "R": Right-hand stroke annotation written over or in place of that beat.
 - "L": Left-hand stroke annotation written over or in place of that beat.
+
+4a. ACCENT MODIFIER ("a"):
+- 1 (integer): A squashed ">" accent mark is displayed above the beat symbol.
+- omit: No accent. The "a" key must only be included when the accent is active.
 
 5. MATHEMATHICAL STEP TIMELINE COORDINATES ("i"):
 The step timeline is a single continuous 0-indexed integer axis. Calculate using:
@@ -871,12 +893,19 @@ Output ONLY the final working markdown URL link block. Do not write introductory
                 for (var s = 0; s < steps.length; s++) {
                     var step = steps[s];
                     var stepIdx = parseInt(step.getAttribute('data-step'), 10);
+                    var isAccented = step.classList.contains('accent');
                     if (step.classList.contains('active')) {
-                        activeNotes.push({i: stepIdx, s: 'A'});
+                        var noteObj = {i: stepIdx, s: 'A'};
+                        if (isAccented) noteObj.a = 1;
+                        activeNotes.push(noteObj);
                     } else if (step.classList.contains('hand-R')) {
-                        activeNotes.push({i: stepIdx, s: 'R'});
+                        var noteObj = {i: stepIdx, s: 'R'};
+                        if (isAccented) noteObj.a = 1;
+                        activeNotes.push(noteObj);
                     } else if (step.classList.contains('hand-L')) {
-                        activeNotes.push({i: stepIdx, s: 'L'});
+                        var noteObj = {i: stepIdx, s: 'L'};
+                        if (isAccented) noteObj.a = 1;
+                        activeNotes.push(noteObj);
                     }
                 }
                 savedData[instId] = activeNotes;
@@ -904,6 +933,7 @@ Output ONLY the final working markdown URL link block. Do not write introductory
                             if (stateType === 'A') step.classList.add('active');
                             else if (stateType === 'R') step.classList.add('hand-R');
                             else if (stateType === 'L') step.classList.add('hand-L');
+                            if (typeof note === 'object' && note.a) step.classList.add('accent');
                         }
                     }
                 }
@@ -931,7 +961,7 @@ Output ONLY the final working markdown URL link block. Do not write introductory
                     
                     if (sourceBox && targetBox) {
                         // Reset target states completely before cloning values
-                        targetBox.classList.remove('active', 'hand-R', 'hand-L');
+                        targetBox.classList.remove('active', 'hand-R', 'hand-L', 'accent');
                         
                         if (sourceBox.classList.contains('active')) {
                             targetBox.classList.add('active');
@@ -939,6 +969,9 @@ Output ONLY the final working markdown URL link block. Do not write introductory
                             targetBox.classList.add('hand-R');
                         } else if (sourceBox.classList.contains('hand-L')) {
                             targetBox.classList.add('hand-L');
+                        }
+                        if (sourceBox.classList.contains('accent')) {
+                            targetBox.classList.add('accent');
                         }
                     }
                 }
@@ -972,9 +1005,9 @@ Output ONLY the final working markdown URL link block. Do not write introductory
                         if (note.i >= startDelIdx && note.i < endDelIdx) {
                             continue; 
                         } else if (note.i >= endDelIdx) {
-                            newNotesList.push({i: note.i - stepsPerBar, s: note.s}); 
+                            newNotesList.push({i: note.i - stepsPerBar, s: note.s, a: note.a}); 
                         } else {
-                            newNotesList.push({i: note.i, s: note.s}); 
+                            newNotesList.push({i: note.i, s: note.s, a: note.a}); 
                         }
                     }
                     newNotes[instId] = newNotesList;
@@ -1008,18 +1041,18 @@ Output ONLY the final working markdown URL link block. Do not write introductory
                     if (type === 'start') {
                         for (var i = 0; i < oldNotes.length; i++) {
                             var note = oldNotes[i];
-                            newNotesList.push({i: note.i + stepsPerBar, s: note.s}); 
+                            newNotesList.push({i: note.i + stepsPerBar, s: note.s, a: note.a}); 
                             if (note.i < stepsPerBar) {
-                                newNotesList.push({i: note.i, s: note.s}); 
+                                newNotesList.push({i: note.i, s: note.s, a: note.a}); 
                             }
                         }
                     } else if (type === 'end') {
                         var lastBarStartIdx = (currentBars - 1) * stepsPerBar;
                         for (var i = 0; i < oldNotes.length; i++) {
                             var note = oldNotes[i];
-                            newNotesList.push({i: note.i, s: note.s}); 
+                            newNotesList.push({i: note.i, s: note.s, a: note.a}); 
                             if (note.i >= lastBarStartIdx) {
-                                newNotesList.push({i: note.i + stepsPerBar, s: note.s}); 
+                                newNotesList.push({i: note.i + stepsPerBar, s: note.s, a: note.a}); 
                             }
                         }
                     }
@@ -1287,20 +1320,35 @@ Output ONLY the final working markdown URL link block. Do not write introductory
                         step.classList.add('step');
                         step.setAttribute('data-step', globalStepIndex);
 
-                        // State-Machine Engine: Cycles cleanly across 4 logical click vectors
-                        step.onclick = function() {
-                            if (this.classList.contains('active')) {
+                        // State-Machine Engine: Cycles cleanly across 4 logical click vectors.
+                        // Tapping the top 30% of an active cell toggles the accent mark (mobile-friendly
+                        // alternative to right-click for touch devices that lack a secondary tap).
+                        step.onclick = function(e) {
+                            var isTopZone = (e.offsetY / this.offsetHeight) < 0.30;
+                            var hasSymbol = this.classList.contains('active') || this.classList.contains('hand-R') || this.classList.contains('hand-L');
+                            if (isTopZone && hasSymbol) {
+                                this.classList.toggle('accent');
+                            } else if (this.classList.contains('active')) {
                                 this.classList.remove('active');
                                 this.classList.add('hand-R');
                             } else if (this.classList.contains('hand-R')) {
                                 this.classList.remove('hand-R');
                                 this.classList.add('hand-L');
                             } else if (this.classList.contains('hand-L')) {
-                                this.classList.remove('hand-L');
+                                this.classList.remove('hand-L', 'accent');
                             } else {
                                 this.classList.add('active');
                             }
                             updateURL();
+                        };
+
+                        // Accent Toggle: Right-click adds/removes accent mark on active notes (desktop)
+                        step.oncontextmenu = function(e) {
+                            e.preventDefault();
+                            if (this.classList.contains('active') || this.classList.contains('hand-R') || this.classList.contains('hand-L')) {
+                                this.classList.toggle('accent');
+                                updateURL();
+                            }
                         };
 
                         stepsContainer.appendChild(step);
@@ -1558,7 +1606,7 @@ Output ONLY the final working markdown URL link block. Do not write introductory
         document.getElementById('clearBtn').onclick = function() {
             var allSteps = document.querySelectorAll('.step');
             for (var i = 0; i < allSteps.length; i++) {
-                allSteps[i].classList.remove('active', 'hand-R', 'hand-L');
+                allSteps[i].classList.remove('active', 'hand-R', 'hand-L', 'accent');
             }
             updateURL();
         };
