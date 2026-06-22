@@ -1,0 +1,11 @@
+{
+  "name": "drukkit",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:regression": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.0"
+  }
+}
