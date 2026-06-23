@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 
-const appPath = '/publish/drukkit.html';
+const appPath = '/publish/index.html';
 
 async function gotoApp(page, search = '') {
   await page.goto(`${appPath}${search}`);
@@ -97,7 +97,7 @@ test('loads the default groove and share state', async ({ page }) => {
     });
   }).toMatchObject({
     search: expect.stringContaining('tracks='),
-    qr: expect.stringContaining(encodeURIComponent('/publish/drukkit.html'))
+    qr: expect.stringContaining(encodeURIComponent('/publish/index.html'))
   });
 });
 

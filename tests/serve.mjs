@@ -16,7 +16,7 @@ const mimeTypes = {
 };
 
 function resolvePath(urlPath) {
-  const pathname = urlPath === '/' ? '/publish/drukkit.html' : urlPath;
+  const pathname = urlPath === '/' ? '/publish/index.html' : urlPath;
   const decoded = decodeURIComponent(pathname.split('?')[0]);
   const fullPath = normalize(join(rootDir, decoded));
   if (!fullPath.startsWith(rootDir)) return null;
