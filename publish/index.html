@@ -264,11 +264,16 @@
             outline: none;
         }
 
-        .symbol-select {
+        .symbol-cycle-btn {
             padding: 4px 6px;
             font-size: 12px;
             width: 55px;
             flex-shrink: 0;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            cursor: pointer;
+            border-radius: 4px;
         }
 
         .delete-track-btn {
@@ -618,7 +623,7 @@
             .controls,
             .delete-track-btn,
             .drag-handle,
-            .symbol-select,
+            .symbol-cycle-btn,
             .bar-copy-menu,
             .schema-container,
             #addTrackBtn {
@@ -1299,25 +1304,19 @@ Output ONLY the final working markdown URL link block. Do not write introductory
             dragHandle.innerHTML = '&#10303;'; // ⠿ braille grip icon
             labelCtrls.appendChild(dragHandle);
 
-            var symSelect = document.createElement('select');
-            symSelect.classList.add('symbol-select');
+            var symBtn = document.createElement('button');
+            symBtn.classList.add('symbol-cycle-btn');
+            symBtn.textContent = inst.symbol === 'cross' ? '✕' : '●';
+            symBtn.title = 'Toggle symbol';
             
-            var optCircle = document.createElement('option');
-            optCircle.value = 'circle'; optCircle.textContent = '●';
-            var optCross = document.createElement('option');
-            optCross.value = 'cross'; optCross.textContent = '✖';
-            
-            symSelect.appendChild(optCircle);
-            symSelect.appendChild(optCross);
-            symSelect.value = inst.symbol;
-            
-            symSelect.onchange = function() {
+            symBtn.onclick = function() {
                 row.classList.remove('sym-circle', 'sym-cross');
-                inst.symbol = this.value;
+                inst.symbol = inst.symbol === 'circle' ? 'cross' : 'circle';
                 row.classList.add('sym-' + inst.symbol);
+                symBtn.textContent = inst.symbol === 'cross' ? '✕' : '●';
                 updateURL();
             };
-            labelCtrls.appendChild(symSelect);
+            labelCtrls.appendChild(symBtn);
 
             var input = document.createElement('input');
             input.type = 'text';
