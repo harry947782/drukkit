@@ -37,6 +37,10 @@
             --svg-letter-r: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext x='12' y='12' font-family='sans-serif' font-weight='bold' font-size='18' fill='%23ffffff' text-anchor='middle' dominant-baseline='central'%3ER%3C/text%3E%3C/svg%3E");
             --svg-letter-l: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext x='12' y='12' font-family='sans-serif' font-weight='bold' font-size='18' fill='%23ffffff' text-anchor='middle' dominant-baseline='central'%3EL%3C/text%3E%3C/svg%3E");
             --svg-accent: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' fill='none' d='M2,1 L22,7 L2,13'/%3E%3C/svg%3E");
+            --svg-open-circle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%23ffffff' stroke-width='2.5'/%3E%3C/svg%3E");
+            --svg-slash: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%23ffffff' stroke-width='3.5' stroke-linecap='round' d='M6,20 L18,4'/%3E%3C/svg%3E");
+            --svg-backslash: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%23ffffff' stroke-width='3.5' stroke-linecap='round' d='M6,4 L18,20'/%3E%3C/svg%3E");
+            --svg-plus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%23ffffff' stroke-width='3.5' stroke-linecap='round' d='M12,4 L12,20 M4,12 L20,12'/%3E%3C/svg%3E");
         }
 
         body.light-mode {
@@ -64,6 +68,10 @@
             --svg-letter-r: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext x='12' y='12' font-family='sans-serif' font-weight='bold' font-size='18' fill='%231a1a1a' text-anchor='middle' dominant-baseline='central'%3ER%3C/text%3E%3C/svg%3E");
             --svg-letter-l: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext x='12' y='12' font-family='sans-serif' font-weight='bold' font-size='18' fill='%231a1a1a' text-anchor='middle' dominant-baseline='central'%3EL%3C/text%3E%3C/svg%3E");
             --svg-accent: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath stroke='%231a1a1a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' fill='none' d='M2,1 L22,7 L2,13'/%3E%3C/svg%3E");
+            --svg-open-circle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%231a1a1a' stroke-width='2.5'/%3E%3C/svg%3E");
+            --svg-slash: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%231a1a1a' stroke-width='3.5' stroke-linecap='round' d='M6,20 L18,4'/%3E%3C/svg%3E");
+            --svg-backslash: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%231a1a1a' stroke-width='3.5' stroke-linecap='round' d='M6,4 L18,20'/%3E%3C/svg%3E");
+            --svg-plus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%231a1a1a' stroke-width='3.5' stroke-linecap='round' d='M12,4 L12,20 M4,12 L20,12'/%3E%3C/svg%3E");
         }
 
         * {
@@ -205,7 +213,7 @@
         .notation-grid-wrapper {
             display: flex;
             flex-direction: column;
-            gap: 48px; 
+            gap: 64px; 
         }
 
         .track-row {
@@ -217,7 +225,7 @@
 
         /* Beat Count Column Header Row Overrides */
         .track-row.header-row {
-            margin-bottom: -32px; 
+            margin-bottom: -36px; 
         }
 
         /* Instrument Control Label Area */
@@ -246,7 +254,7 @@
             color: var(--text-color);
             font-weight: bold;
             text-transform: uppercase;
-            font-size: 13px;
+            font-size: 15px;
             letter-spacing: 1px;
             padding: 6px;
             border-radius: 4px;
@@ -264,11 +272,20 @@
             outline: none;
         }
 
-        .symbol-select {
+        .symbol-cycle-btn {
             padding: 4px 6px;
-            font-size: 12px;
-            width: 55px;
+            font-size: 16px;
+            width: 38px;
             flex-shrink: 0;
+            background-color: var(--select-bg);
+            border-color: var(--step-border);
+            font-weight: normal;
+            line-height: 1.2;
+        }
+
+        .symbol-cycle-btn:hover {
+            border-color: var(--accent-color);
+            background-color: var(--step-hover);
         }
 
         .delete-track-btn {
@@ -379,6 +396,22 @@
             background-image: var(--svg-cross);
         }
 
+        .track-row.sym-open-circle .step.active {
+            background-image: var(--svg-open-circle);
+        }
+
+        .track-row.sym-slash .step.active {
+            background-image: var(--svg-slash);
+        }
+
+        .track-row.sym-backslash .step.active {
+            background-image: var(--svg-backslash);
+        }
+
+        .track-row.sym-plus .step.active {
+            background-image: var(--svg-plus);
+        }
+
         .step.hand-R {
             background-image: var(--svg-letter-r);
         }
@@ -391,11 +424,12 @@
         .step.accent::after {
             content: '';
             position: absolute;
-            top: -3%;
+            bottom: 100%;
             left: 50%;
             transform: translateX(-50%);
+            margin-bottom: 3px;
             width: 55%;
-            height: 22%;
+            height: 30%;
             background-image: var(--svg-accent);
             background-repeat: no-repeat;
             background-position: center;
@@ -413,8 +447,8 @@
             width: 4px;
             left: 50%;
             transform: translateX(-50%);
-            top: -26px; 
-            bottom: -26px; 
+            top: -32px; 
+            bottom: -32px; 
             background-color: var(--bar-divider);
             z-index: 2;
             transition: background-color 0.15s, box-shadow 0.15s;
@@ -618,7 +652,7 @@
             .controls,
             .delete-track-btn,
             .drag-handle,
-            .symbol-select,
+            .symbol-cycle-btn,
             .bar-copy-menu,
             .schema-container,
             #addTrackBtn {
@@ -645,11 +679,11 @@
             }
 
             .notation-grid-wrapper {
-                gap: 36px !important; 
+                gap: 44px !important; 
             }
 
             .track-row.header-row {
-                margin-bottom: -20px !important;
+                margin-bottom: -24px !important;
             }
 
             /* FIXED UNIFORMITY: Freeze track name widths to ensure identical grid starts */
@@ -705,6 +739,22 @@
                 background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%23000000' stroke-width='3.5' stroke-linecap='round' d='M4,4 L20,20 M20,4 L4,20'/%3E%3C/svg%3E") !important;
             }
 
+            .track-row.sym-open-circle .step.active {
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%23000000' stroke-width='2.5'/%3E%3C/svg%3E") !important;
+            }
+
+            .track-row.sym-slash .step.active {
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%23000000' stroke-width='3.5' stroke-linecap='round' d='M6,20 L18,4'/%3E%3C/svg%3E") !important;
+            }
+
+            .track-row.sym-backslash .step.active {
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%23000000' stroke-width='3.5' stroke-linecap='round' d='M6,4 L18,20'/%3E%3C/svg%3E") !important;
+            }
+
+            .track-row.sym-plus .step.active {
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%23000000' stroke-width='3.5' stroke-linecap='round' d='M12,4 L12,20 M4,12 L20,12'/%3E%3C/svg%3E") !important;
+            }
+
             .step.hand-R {
                 background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext x='12' y='12' font-family='sans-serif' font-weight='bold' font-size='18' fill='%23000000' text-anchor='middle' dominant-baseline='central'%3ER%3C/text%3E%3C/svg%3E") !important;
             }
@@ -726,8 +776,8 @@
             .gap-bar-line::before {
                 background-color: #000000 !important; 
                 width: 4px !important;
-                top: -16px !important;
-                bottom: -16px !important;
+                top: -22px !important;
+                bottom: -22px !important;
             }
 
             /* Remarks Layout Printing Optimization */
@@ -820,7 +870,7 @@ https://harry947782.github.io/drukkit/drukkit.html
 {
   "id": "unique_string_key",
   "name": "display_instrument_name",
-  "sym": "circle" or "cross",
+  "sym": "circle", "cross", "open-circle", "slash", "backslash", or "plus",
   "notes": [{"i": global_step_index_integer, "s": "state_token_character", "a": 1_or_omitted}]
 }
 
@@ -852,6 +902,22 @@ Output ONLY the final working markdown URL link block. Do not write introductory
             '2/4': { beats: 2, subs: [{v:'quarter', l:'Quarter Notes', m:1}, {v:'8th', l:'8th Notes', m:2}, {v:'12th', l:'12th Notes (Triplets)', m:3}, {v:'16th', l:'16th Notes', m:4}] },
             '6/8': { beats: 6, subs: [{v:'8th', l:'8th Notes', m:1}, {v:'16th', l:'16th Notes', m:2}] }
         };
+
+        var symOptions = [
+            { v: 'circle',      label: '●', title: 'Filled Circle' },
+            { v: 'cross',       label: '✕', title: 'Cross (X)' },
+            { v: 'open-circle', label: '○', title: 'Open Circle' },
+            { v: 'slash',       label: '/',  title: 'Forward Slash' },
+            { v: 'backslash',   label: '\\', title: 'Backslash' },
+            { v: 'plus',        label: '+',  title: 'Plus' }
+        ];
+
+        function findSymIndex(symbol) {
+            for (var i = 0; i < symOptions.length; i++) {
+                if (symOptions[i].v === symbol) return i;
+            }
+            return 0;
+        }
 
         var liveInstrumentsMemory = [
             { id: 'hihat', defaultName: 'hihat', symbol: 'cross' },
@@ -1299,25 +1365,24 @@ Output ONLY the final working markdown URL link block. Do not write introductory
             dragHandle.innerHTML = '&#10303;'; // ⠿ braille grip icon
             labelCtrls.appendChild(dragHandle);
 
-            var symSelect = document.createElement('select');
-            symSelect.classList.add('symbol-select');
-            
-            var optCircle = document.createElement('option');
-            optCircle.value = 'circle'; optCircle.textContent = '●';
-            var optCross = document.createElement('option');
-            optCross.value = 'cross'; optCross.textContent = '✖';
-            
-            symSelect.appendChild(optCircle);
-            symSelect.appendChild(optCross);
-            symSelect.value = inst.symbol;
-            
-            symSelect.onchange = function() {
-                row.classList.remove('sym-circle', 'sym-cross');
-                inst.symbol = this.value;
+            var curSymOpt = symOptions[findSymIndex(inst.symbol)];
+
+            var symBtn = document.createElement('button');
+            symBtn.classList.add('symbol-cycle-btn');
+            symBtn.textContent = curSymOpt.label;
+            symBtn.title = curSymOpt.title + ' — click to cycle symbol';
+
+            symBtn.onclick = function(e) {
+                e.stopPropagation();
+                row.classList.remove('sym-' + inst.symbol);
+                var nextIdx = (findSymIndex(inst.symbol) + 1) % symOptions.length;
+                inst.symbol = symOptions[nextIdx].v;
                 row.classList.add('sym-' + inst.symbol);
+                symBtn.textContent = symOptions[nextIdx].label;
+                symBtn.title = symOptions[nextIdx].title + ' — click to cycle symbol';
                 updateURL();
             };
-            labelCtrls.appendChild(symSelect);
+            labelCtrls.appendChild(symBtn);
 
             var input = document.createElement('input');
             input.type = 'text';

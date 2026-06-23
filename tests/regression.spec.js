@@ -131,7 +131,7 @@ test('serializes custom edits into the URL and restores them on reload', async (
   await page.locator('#projectTitle').fill('Linear Fusion');
   await page.locator('#compositionNotes').fill('Practice with alternating accents');
   await page.locator('.track-row[data-instrument="snare"] .instrument-label-input').fill('backbeat');
-  await page.locator('.track-row[data-instrument="snare"] .symbol-select').selectOption('cross');
+  await page.locator('.track-row[data-instrument="snare"] .symbol-cycle-btn').click();
 
   await clickStep(page, 'snare', 2);
   await clickStep(page, 'snare', 2, { button: 'right' });
@@ -176,7 +176,7 @@ test('serializes custom edits into the URL and restores them on reload', async (
   await expect(page.locator('#projectTitle')).toHaveValue('Linear Fusion');
   await expect(page.locator('#compositionNotes')).toHaveValue('Practice with alternating accents');
   await expect(page.locator('.track-row[data-instrument="snare"] .instrument-label-input')).toHaveValue('backbeat');
-  await expect(page.locator('.track-row[data-instrument="snare"] .symbol-select')).toHaveValue('cross');
+  await expect(page.locator('.track-row[data-instrument="snare"] .symbol-cycle-btn')).toHaveText('✕');
   expect(await stepClasses(page, 'snare', 2)).toEqual({ active: true, right: false, left: false, accent: true });
   expect(await stepClasses(page, 'snare', 3)).toEqual({ active: false, right: true, left: false, accent: false });
   expect(await stepClasses(page, 'bass', 7)).toEqual({ active: false, right: false, left: true, accent: false });
