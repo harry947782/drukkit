@@ -48,6 +48,17 @@
             return val;
         }
 
+        function updateNotesContainerClass() {
+            var notesContainer = document.querySelector('.notes-container');
+            if (notesContainer) {
+                if (compositionNotes.value.trim().length === 0) {
+                    notesContainer.classList.add('empty');
+                } else {
+                    notesContainer.classList.remove('empty');
+                }
+            }
+        }
+
         function updateSubdivisionDropdown() {
             var sig = timeSigSelect.value;
             var options = timeSigConfig[sig].subs;
@@ -1125,6 +1136,7 @@
             }
             
             // Core Fix: Forces QR rendering on original link hydration or bootup cycle
+            updateNotesContainerClass();
             updateURL();
         }
 
@@ -1135,6 +1147,7 @@
         };
 
         compositionNotes.oninput = function() {
+            updateNotesContainerClass();
             updateURL();
         };
 
