@@ -4,6 +4,18 @@ This document serves as the absolute blueprint and system instruction manual for
 
 ---
 
+## Running Existing Tests
+
+Use the existing Playwright regression suite:
+
+```bash
+npm install
+npx playwright install --with-deps chromium
+npm test
+```
+
+---
+
 ## 1. Architectural Principles & System Design
 
 To bypass browser local `file:///` CORS security restrictions and remain endlessly portable, Drukkit relies on a strict single-file decoupled architecture.
