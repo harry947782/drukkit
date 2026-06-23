@@ -62,24 +62,51 @@
         }
 
         // Compression/decompression functions for QR code URL optimization
-        function compressState(tracksPayload, timeVal, barsVal, subVal) {
-            // Encode metadata into compact form: time (3 bits) + bars (4 bits) + sub (2 bits)
-            var timeMap = {'4/4': 0, '3/4': 1, '2/4': 2, '6/8': 3};
+        function compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal) {
+            // Encode metadata: time (2 bits) + bars (4 bits) + sub (2 bits) + hasTitle (1 bit) + hasNotes (1 bit)
+            var timeMap = {'4/4': 0, '3/4': 1, '2/2': 2, '6/8': 3};
             var subMap = {'quarter': 0, '8th': 1, '12th': 2, '16th': 3};
             var timeBits = timeMap[timeVal] || 0;
             var barsBits = (parseInt(barsVal, 10) - 1) & 0xF;
             var subBits = subMap[subVal] || 3;
+            var hasTitle = (titleVal && titleVal !== 'My Drum Groove Composition') ? 1 : 0;
+            var hasNotes = (notesVal && notesVal.length > 0) ? 1 : 0;
             
-            var metadata = (timeBits << 6) | (barsBits << 2) | subBits;
+            var metadata = (timeBits << 6) | (barsBits << 2) | (subBits << 0) | (hasTitle << 8) | (hasNotes << 9);
             
-            // Encode each track's notes using run-length encoding
-            var trackParts = [];
+            // Build compressed data with proper byte order
+            var data = [];
+            data.push((metadata >> 8) & 0xFF);
+            data.push(metadata & 0xFF);
+            
+            // Encode title if present
+            if (hasTitle) {
+                var titleBytes = new TextEncoder().encode(titleVal);
+                data.push(Math.min(titleBytes.length, 255));
+                for (var tb = 0; tb < Math.min(titleBytes.length, 255); tb++) {
+                    data.push(titleBytes[tb]);
+                }
+            }
+            
+            // Encode notes if present
+            if (hasNotes) {
+                var notesBytes = new TextEncoder().encode(notesVal);
+                data.push((notesBytes.length >> 8) & 0xFF);
+                data.push(notesBytes.length & 0xFF);
+                for (var nb = 0; nb < notesBytes.length; nb++) {
+                    data.push(notesBytes[nb]);
+                }
+            }
+            
+            // Encode each track's notes with proper length encoding
+            data.push(tracksPayload.length);
+            
             for (var t = 0; t < tracksPayload.length; t++) {
                 var track = tracksPayload[t];
                 var symIndex = findSymIndex(track.sym);
                 var notes = track.notes || [];
                 
-                // Encode notes: for each note, pack index offset (variable length), state (2 bits), accent (1 bit)
+                // Encode notes with variable-length format for offsets and 6 bits for note count
                 var noteParts = [];
                 var lastIdx = -1;
                 
@@ -91,26 +118,33 @@
                     var stateBits = stateMap[note.s] || 0;
                     var accentBit = (note.a) ? 1 : 0;
                     
-                    // Encode offset as variable-length: if < 32, use 1 byte; else use 2 bytes with high bit set
-                    var encodedOffset;
+                    // Encode as: offset (high bits) + state (2 bits) + accent (1 bit)
+                    // For offsets < 32: single byte; for >= 32: two bytes with continuation bit
                     if (offset < 32) {
-                        encodedOffset = String.fromCharCode((offset << 3) | (stateBits << 1) | accentBit);
+                        noteParts.push((offset << 3) | (stateBits << 1) | accentBit);
                     } else {
-                        encodedOffset = String.fromCharCode(0x80 | (offset & 0x7F)) + 
-                                      String.fromCharCode((stateBits << 6) | ((offset >> 7) & 0x3F));
+                        noteParts.push(0x80 | (offset & 0x7F));
+                        noteParts.push(((offset >> 7) & 0x3F) | (stateBits << 6) | (accentBit << 8));
                     }
-                    noteParts.push(encodedOffset);
                     lastIdx = idx;
                 }
                 
-                // Pack track: symbol (3 bits) + note data
-                var trackByte = String.fromCharCode((symIndex << 5) | (noteParts.length & 0x1F));
-                trackParts.push(trackByte + noteParts.join(''));
+                // Pack track header: symbol (3 bits) + note count (8 bits for up to 256 notes)
+                data.push((symIndex << 5) | (noteParts.length >> 3));
+                data.push((noteParts.length & 0x07) << 5);
+                
+                // Add note data
+                for (var np = 0; np < noteParts.length; np++) {
+                    data.push(noteParts[np] & 0xFF);
+                }
             }
             
-            // Combine all parts and encode as base64
-            var allData = String.fromCharCode(metadata) + trackParts.join('');
-            return btoa(allData);
+            // Convert data array to binary string and encode as base64
+            var binaryString = '';
+            for (var i = 0; i < data.length; i++) {
+                binaryString += String.fromCharCode(data[i]);
+            }
+            return btoa(binaryString);
         }
 
         function decompressState(compressed) {
@@ -118,27 +152,56 @@
                 var allData = atob(compressed);
                 var idx = 0;
                 
-                // Decode metadata
-                var metadata = allData.charCodeAt(idx++);
+                // Decode metadata (2 bytes)
+                var metadata = (allData.charCodeAt(idx++) << 8) | allData.charCodeAt(idx++);
                 var timeBits = (metadata >> 6) & 0x3;
                 var barsBits = (metadata >> 2) & 0xF;
-                var subBits = metadata & 0x3;
+                var subBits = (metadata >> 0) & 0x3;
+                var hasTitle = (metadata >> 8) & 0x1;
+                var hasNotes = (metadata >> 9) & 0x1;
                 
-                var timeReverseMap = {0: '4/4', 1: '3/4', 2: '2/4', 3: '6/8'};
+                var timeReverseMap = {0: '4/4', 1: '3/4', 2: '2/2', 3: '6/8'};
                 var subReverseMap = {0: 'quarter', 1: '8th', 2: '12th', 3: '16th'};
                 
                 var timeVal = timeReverseMap[timeBits];
                 var barsVal = String(barsBits + 1);
                 var subVal = subReverseMap[subBits];
+                var titleVal = 'My Drum Groove Composition';
+                var notesVal = '';
+                
+                // Decode title if present
+                if (hasTitle) {
+                    var titleLen = allData.charCodeAt(idx++);
+                    var titleBytes = [];
+                    for (var i = 0; i < titleLen; i++) {
+                        titleBytes.push(allData.charCodeAt(idx++));
+                    }
+                    titleVal = new TextDecoder().decode(new Uint8Array(titleBytes));
+                }
+                
+                // Decode notes if present
+                if (hasNotes) {
+                    var notesLen = (allData.charCodeAt(idx++) << 8) | allData.charCodeAt(idx++);
+                    var notesBytes = [];
+                    for (var i = 0; i < notesLen; i++) {
+                        notesBytes.push(allData.charCodeAt(idx++));
+                    }
+                    notesVal = new TextDecoder().decode(new Uint8Array(notesBytes));
+                }
+                
+                // Decode track count
+                var trackCount = allData.charCodeAt(idx++);
                 
                 // Decode tracks
                 var decompTracks = [];
-                var trackIdx = 0;
                 
-                while (idx < allData.length && trackIdx < liveInstrumentsMemory.length) {
-                    var trackByte = allData.charCodeAt(idx++);
-                    var symIndex = (trackByte >> 5) & 0x7;
-                    var noteCount = trackByte & 0x1F;
+                for (var t = 0; t < trackCount && t < liveInstrumentsMemory.length; t++) {
+                    var trackHeader1 = allData.charCodeAt(idx++);
+                    var trackHeader2 = allData.charCodeAt(idx++);
+                    var symIndex = (trackHeader1 >> 5) & 0x7;
+                    var noteCountHi = (trackHeader1 & 0x1F);
+                    var noteCountLo = (trackHeader2 >> 5) & 0x7;
+                    var noteCount = (noteCountHi << 3) | noteCountLo;
                     
                     var decompNotes = [];
                     var lastIdx = -1;
@@ -153,7 +216,7 @@
                             var b2 = allData.charCodeAt(idx++);
                             offset = (b1 & 0x7F) | ((b2 & 0x3F) << 7);
                             stateBits = (b2 >> 6) & 0x3;
-                            accentBit = 0;
+                            accentBit = (b2 >> 8) & 0x1;
                         } else {
                             // Single-byte encoding
                             offset = (b1 >> 3) & 0x1F;
@@ -169,26 +232,32 @@
                     }
                     
                     var trackSym = symOptions[symIndex] ? symOptions[symIndex].v : 'circle';
-                    var inst = liveInstrumentsMemory[trackIdx];
+                    var inst = liveInstrumentsMemory[t];
                     decompTracks.push({
                         id: inst.id,
                         name: inst.defaultName,
                         sym: trackSym,
                         notes: decompNotes
                     });
-                    trackIdx++;
                 }
                 
                 return {
                     time: timeVal,
                     bars: barsVal,
                     sub: subVal,
+                    title: titleVal,
+                    notes: notesVal,
                     tracks: decompTracks
                 };
             } catch (e) {
                 console.error("Failed to decompress state", e);
                 return null;
             }
+        }
+
+        // Helper function to construct base URL
+        function buildBaseUrl() {
+            return window.location.protocol + "//" + window.location.host + window.location.pathname;
         }
 
         // Encodes the dynamic session schema directly into standard URL search parameters
@@ -217,15 +286,15 @@
             params.set('notes', notesVal);
             params.set('tracks', JSON.stringify(tracksPayload));
 
-            var newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?' + params.toString();
+            var newUrl = buildBaseUrl() + '?' + params.toString();
             window.history.replaceState({ path: newUrl }, '', newUrl);
 
             // Generate compressed URL for QR code
             if (printQrCode) {
-                var compressed = compressState(tracksPayload, timeVal, barsVal, subVal);
+                var compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal);
                 var qrParams = new URLSearchParams();
                 qrParams.set('c', compressed);
-                var qrUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?' + qrParams.toString();
+                var qrUrl = buildBaseUrl() + '?' + qrParams.toString();
                 printQrCode.src = "https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=" + encodeURIComponent(qrUrl);
             }
         }
@@ -931,11 +1000,11 @@
             if (params.has('c')) {
                 var decompressed = decompressState(params.get('c'));
                 if (decompressed) {
-                    projectTitle.value = "My Drum Groove Composition";
-                    document.title = "My Drum Groove Composition";
+                    projectTitle.value = decompressed.title || "My Drum Groove Composition";
+                    document.title = decompressed.title || "My Drum Groove Composition";
                     timeSigSelect.value = decompressed.time;
                     barsSelect.value = decompressed.bars;
-                    compositionNotes.value = "";
+                    compositionNotes.value = decompressed.notes || "";
                     
                     var options = timeSigConfig[decompressed.time].subs;
                     subdivisionSelect.innerHTML = '';
