@@ -35,7 +35,8 @@ test.describe('Drukkit Regression Suite', () => {
 
     test('step cycles: empty → active → hand-R → hand-L → empty', async ({ page }) => {
         await page.goto('/index.html');
-        // Click the first step of the hihat row (center click avoids the accent top zone)
+        // Clear the default rhythm so every step starts in the empty state
+        await page.click('#clearBtn');
         const step = page.locator('.track-row[data-instrument="hihat"] .step').first();
 
         // empty → active
@@ -90,7 +91,8 @@ test.describe('Drukkit Regression Suite', () => {
         const urlBefore = page.url();
         const paramsBefore = new URL(urlBefore).searchParams.get('tracks');
 
-        const step = page.locator('.track-row[data-instrument="hihat"] .step[data-step="0"]');
+        // Step 1 is an off-beat subdivision cell, empty by default in 4/4 16th mode
+        const step = page.locator('.track-row[data-instrument="hihat"] .step[data-step="1"]');
         await step.click();
 
         const urlAfter = page.url();
@@ -99,11 +101,11 @@ test.describe('Drukkit Regression Suite', () => {
         // The tracks payload must have changed
         expect(paramsAfter).not.toEqual(paramsBefore);
 
-        // Parsed payload must contain step 0 as active for hihat
+        // Parsed payload must contain step 1 as active for hihat
         const tracks = JSON.parse(paramsAfter);
         const hihat = tracks.find(t => t.id === 'hihat');
         expect(hihat).toBeTruthy();
-        expect(hihat.notes.some(n => n.i === 0 && n.s === 'A')).toBe(true);
+        expect(hihat.notes.some(n => n.i === 1 && n.s === 'A')).toBe(true);
     });
 
     test('project title input updates URL title parameter', async ({ page }) => {
