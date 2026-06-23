@@ -65,6 +65,12 @@
         // Compression/decompression functions for QR code URL optimization
         function compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal) {
             // Encode metadata: time (2 bits) + bars (4 bits) + sub (2 bits) + hasTitle (1 bit) + hasNotes (1 bit)
+            // Bit layout (16-bit value):
+            //   Bits 9: hasNotes flag
+            //   Bit 8:  hasTitle flag
+            //   Bits 6-7: time signature (2 bits: 0=4/4, 1=3/4, 2=2/2, 3=6/8)
+            //   Bits 2-5: bars count - 1 (4 bits: supports 1-16 bars)
+            //   Bits 0-1: subdivision (2 bits: 0=quarter, 1=8th, 2=12th, 3=16th)
             var timeMap = {'4/4': 0, '3/4': 1, '2/2': 2, '6/8': 3};
             var subMap = {'quarter': 0, '8th': 1, '12th': 2, '16th': 3};
             var timeBits = timeMap[timeVal] || 0;
@@ -80,11 +86,17 @@
             data.push((metadata >> 8) & 0xFF);
             data.push(metadata & 0xFF);
             
-            // Encode title if present
+            // Encode title if present (using 2-byte length to support UTF-8 without corruption)
             if (hasTitle) {
                 var titleBytes = new TextEncoder().encode(titleVal);
-                data.push(Math.min(titleBytes.length, 255));
-                for (var tb = 0; tb < Math.min(titleBytes.length, 255); tb++) {
+                // Cap at 65535 bytes (2-byte length field)
+                var titleLen = Math.min(titleBytes.length, 65535);
+                if (titleLen < titleBytes.length) {
+                    console.warn('Title truncated to 65535 bytes for compression');
+                }
+                data.push((titleLen >> 8) & 0xFF);
+                data.push(titleLen & 0xFF);
+                for (var tb = 0; tb < titleLen; tb++) {
                     data.push(titleBytes[tb]);
                 }
             }
@@ -107,7 +119,7 @@
                 var symIndex = findSymIndex(track.sym);
                 var notes = track.notes || [];
                 
-                // Encode notes with variable-length format for offsets and 6 bits for note count
+                // Encode notes with variable-length format for offsets and 5 bits for note count (max 31)
                 var noteParts = [];
                 var lastIdx = -1;
                 
@@ -118,6 +130,11 @@
                     var stateMap = {'A': 0, 'R': 1, 'L': 2};
                     var stateBits = stateMap[note.s] || 0;
                     var accentBit = (note.a) ? 1 : 0;
+                    
+                    // Validate offset doesn't exceed 12-bit limit (4095)
+                    if (offset > 4095) {
+                        console.warn('Note offset ' + offset + ' exceeds maximum 4095, compression may be lossy');
+                    }
                     
                     // Encode as: offset (variable length) + state (2 bits) + accent (1 bit)
                     // For offsets < 32: single byte = [offset(5) | state(2) | accent(1)]
@@ -133,11 +150,16 @@
                     lastIdx = idx;
                 }
                 
+                // Validate note count doesn't exceed 31 (5-bit field)
+                if (noteParts.length > 31) {
+                    console.warn('Track has ' + noteParts.length + ' notes, but compression supports max 31 per track. Notes will be truncated.');
+                }
+                
                 // Pack track header: symbol (3 bits) + note count (5 bits, max 31 notes per track)
                 data.push((symIndex << 5) | Math.min(noteParts.length, 31));
                 
-                // Add note data
-                for (var np = 0; np < noteParts.length; np++) {
+                // Add note data (but only up to 31 notes due to 5-bit count limit)
+                for (var np = 0; np < Math.min(noteParts.length, 31); np++) {
                     data.push(noteParts[np] & 0xFF);
                 }
             }
@@ -156,6 +178,7 @@
                 var idx = 0;
                 
                 // Decode metadata (2 bytes)
+                // Bit layout: bits 9 (hasNotes), bit 8 (hasTitle), bits 6-7 (time), bits 2-5 (bars), bits 0-1 (sub)
                 var metadata = (allData.charCodeAt(idx++) << 8) | allData.charCodeAt(idx++);
                 var timeBits = (metadata >> 6) & 0x3;
                 var barsBits = (metadata >> 2) & 0xF;
@@ -172,9 +195,9 @@
                 var titleVal = defaultProjectTitle;
                 var notesVal = '';
                 
-                // Decode title if present
+                // Decode title if present (now using 2-byte length field)
                 if (hasTitle) {
-                    var titleLen = allData.charCodeAt(idx++);
+                    var titleLen = (allData.charCodeAt(idx++) << 8) | allData.charCodeAt(idx++);
                     var titleBytes = [];
                     for (var i = 0; i < titleLen; i++) {
                         titleBytes.push(allData.charCodeAt(idx++));
@@ -195,13 +218,18 @@
                 // Decode track count
                 var trackCount = allData.charCodeAt(idx++);
                 
+                // Validate track count doesn't exceed available instruments
+                if (trackCount > liveInstrumentsMemory.length) {
+                    console.warn('Compressed data contains ' + trackCount + ' tracks, but only ' + liveInstrumentsMemory.length + ' instruments available. Extra tracks will be dropped.');
+                }
+                
                 // Decode tracks
                 var decompTracks = [];
                 
                 for (var t = 0; t < trackCount && t < liveInstrumentsMemory.length; t++) {
                     var trackByte = allData.charCodeAt(idx++);
                     var symIndex = (trackByte >> 5) & 0x7;
-                    var noteCount = trackByte & 0x1F;  // 5 bits for note count
+                    var noteCount = trackByte & 0x1F;  // 5 bits for note count (max 31)
             
                     var decompNotes = [];
                     var lastIdx = -1;
