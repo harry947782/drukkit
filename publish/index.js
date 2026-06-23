@@ -66,7 +66,7 @@
         function compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal) {
             // Encode metadata: time (2 bits) + bars (4 bits) + sub (2 bits) + hasTitle (1 bit) + hasNotes (1 bit)
             // Bit layout (16-bit value):
-            //   Bits 9: hasNotes flag
+            //   Bit 9:  hasNotes flag
             //   Bit 8:  hasTitle flag
             //   Bits 6-7: time signature (2 bits: 0=4/4, 1=3/4, 2=2/2, 3=6/8)
             //   Bits 2-5: bars count - 1 (4 bits: supports 1-16 bars)
@@ -100,13 +100,18 @@
                     data.push(titleBytes[tb]);
                 }
             }
-            
+             
             // Encode notes if present
             if (hasNotes) {
                 var notesBytes = new TextEncoder().encode(notesVal);
-                data.push((notesBytes.length >> 8) & 0xFF);
-                data.push(notesBytes.length & 0xFF);
-                for (var nb = 0; nb < notesBytes.length; nb++) {
+                // Cap at 65535 bytes (2-byte length field)
+                var notesLen = Math.min(notesBytes.length, 65535);
+                if (notesLen < notesBytes.length) {
+                    console.warn('Notes truncated to 65535 bytes for compression');
+                }
+                data.push((notesLen >> 8) & 0xFF);
+                data.push(notesLen & 0xFF);
+                for (var nb = 0; nb < notesLen; nb++) {
                     data.push(notesBytes[nb]);
                 }
             }
@@ -151,8 +156,8 @@
                 }
                 
                 // Validate note count doesn't exceed 31 (5-bit field)
-                if (noteParts.length > 31) {
-                    console.warn('Track has ' + noteParts.length + ' notes, but compression supports max 31 per track. Notes will be truncated.');
+                if (notes.length > 31) {
+                    console.warn('Track has ' + notes.length + ' notes, but compression supports max 31 per track. Notes will be truncated.');
                 }
                 
                 // Pack track header: symbol (3 bits) + note count (5 bits, max 31 notes per track)
