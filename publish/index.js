@@ -61,6 +61,136 @@
             subdivisionSelect.value = '16th';
         }
 
+        // Compression/decompression functions for QR code URL optimization
+        function compressState(tracksPayload, timeVal, barsVal, subVal) {
+            // Encode metadata into compact form: time (3 bits) + bars (4 bits) + sub (2 bits)
+            var timeMap = {'4/4': 0, '3/4': 1, '2/4': 2, '6/8': 3};
+            var subMap = {'quarter': 0, '8th': 1, '12th': 2, '16th': 3};
+            var timeBits = timeMap[timeVal] || 0;
+            var barsBits = (parseInt(barsVal, 10) - 1) & 0xF;
+            var subBits = subMap[subVal] || 3;
+            
+            var metadata = (timeBits << 6) | (barsBits << 2) | subBits;
+            
+            // Encode each track's notes using run-length encoding
+            var trackParts = [];
+            for (var t = 0; t < tracksPayload.length; t++) {
+                var track = tracksPayload[t];
+                var symIndex = findSymIndex(track.sym);
+                var notes = track.notes || [];
+                
+                // Encode notes: for each note, pack index offset (variable length), state (2 bits), accent (1 bit)
+                var noteParts = [];
+                var lastIdx = -1;
+                
+                for (var n = 0; n < notes.length; n++) {
+                    var note = notes[n];
+                    var idx = note.i;
+                    var offset = idx - lastIdx - 1;
+                    var stateMap = {'A': 0, 'R': 1, 'L': 2};
+                    var stateBits = stateMap[note.s] || 0;
+                    var accentBit = (note.a) ? 1 : 0;
+                    
+                    // Encode offset as variable-length: if < 32, use 1 byte; else use 2 bytes with high bit set
+                    var encodedOffset;
+                    if (offset < 32) {
+                        encodedOffset = String.fromCharCode((offset << 3) | (stateBits << 1) | accentBit);
+                    } else {
+                        encodedOffset = String.fromCharCode(0x80 | (offset & 0x7F)) + 
+                                      String.fromCharCode((stateBits << 6) | ((offset >> 7) & 0x3F));
+                    }
+                    noteParts.push(encodedOffset);
+                    lastIdx = idx;
+                }
+                
+                // Pack track: symbol (3 bits) + note data
+                var trackByte = String.fromCharCode((symIndex << 5) | (noteParts.length & 0x1F));
+                trackParts.push(trackByte + noteParts.join(''));
+            }
+            
+            // Combine all parts and encode as base64
+            var allData = String.fromCharCode(metadata) + trackParts.join('');
+            return btoa(allData);
+        }
+
+        function decompressState(compressed) {
+            try {
+                var allData = atob(compressed);
+                var idx = 0;
+                
+                // Decode metadata
+                var metadata = allData.charCodeAt(idx++);
+                var timeBits = (metadata >> 6) & 0x3;
+                var barsBits = (metadata >> 2) & 0xF;
+                var subBits = metadata & 0x3;
+                
+                var timeReverseMap = {0: '4/4', 1: '3/4', 2: '2/4', 3: '6/8'};
+                var subReverseMap = {0: 'quarter', 1: '8th', 2: '12th', 3: '16th'};
+                
+                var timeVal = timeReverseMap[timeBits];
+                var barsVal = String(barsBits + 1);
+                var subVal = subReverseMap[subBits];
+                
+                // Decode tracks
+                var decompTracks = [];
+                var trackIdx = 0;
+                
+                while (idx < allData.length && trackIdx < liveInstrumentsMemory.length) {
+                    var trackByte = allData.charCodeAt(idx++);
+                    var symIndex = (trackByte >> 5) & 0x7;
+                    var noteCount = trackByte & 0x1F;
+                    
+                    var decompNotes = [];
+                    var lastIdx = -1;
+                    var stateReverseMap = {0: 'A', 1: 'R', 2: 'L'};
+                    
+                    for (var n = 0; n < noteCount; n++) {
+                        var b1 = allData.charCodeAt(idx++);
+                        var offset, stateBits, accentBit;
+                        
+                        if (b1 & 0x80) {
+                            // Multi-byte encoding
+                            var b2 = allData.charCodeAt(idx++);
+                            offset = (b1 & 0x7F) | ((b2 & 0x3F) << 7);
+                            stateBits = (b2 >> 6) & 0x3;
+                            accentBit = 0;
+                        } else {
+                            // Single-byte encoding
+                            offset = (b1 >> 3) & 0x1F;
+                            stateBits = (b1 >> 1) & 0x3;
+                            accentBit = b1 & 0x1;
+                        }
+                        
+                        var noteIdx = lastIdx + offset + 1;
+                        var noteObj = {i: noteIdx, s: stateReverseMap[stateBits]};
+                        if (accentBit) noteObj.a = 1;
+                        decompNotes.push(noteObj);
+                        lastIdx = noteIdx;
+                    }
+                    
+                    var trackSym = symOptions[symIndex] ? symOptions[symIndex].v : 'circle';
+                    var inst = liveInstrumentsMemory[trackIdx];
+                    decompTracks.push({
+                        id: inst.id,
+                        name: inst.defaultName,
+                        sym: trackSym,
+                        notes: decompNotes
+                    });
+                    trackIdx++;
+                }
+                
+                return {
+                    time: timeVal,
+                    bars: barsVal,
+                    sub: subVal,
+                    tracks: decompTracks
+                };
+            } catch (e) {
+                console.error("Failed to decompress state", e);
+                return null;
+            }
+        }
+
         // Encodes the dynamic session schema directly into standard URL search parameters
         function updateURL() {
             var titleVal = projectTitle.value;
@@ -90,9 +220,13 @@
             var newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?' + params.toString();
             window.history.replaceState({ path: newUrl }, '', newUrl);
 
-            // Re-render vector QR parameters dynamically 
+            // Generate compressed URL for QR code
             if (printQrCode) {
-                printQrCode.src = "https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=" + encodeURIComponent(newUrl);
+                var compressed = compressState(tracksPayload, timeVal, barsVal, subVal);
+                var qrParams = new URLSearchParams();
+                qrParams.set('c', compressed);
+                var qrUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?' + qrParams.toString();
+                printQrCode.src = "https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=" + encodeURIComponent(qrUrl);
             }
         }
 
@@ -792,7 +926,49 @@
         // Intercepts shareable link inputs or defaults to core workspace settings on fresh runtimes
         function initFromURLOrDefaults() {
             var params = new URLSearchParams(window.location.search);
-            if (params.has('tracks')) {
+            
+            // Check for compressed format first
+            if (params.has('c')) {
+                var decompressed = decompressState(params.get('c'));
+                if (decompressed) {
+                    projectTitle.value = "My Drum Groove Composition";
+                    document.title = "My Drum Groove Composition";
+                    timeSigSelect.value = decompressed.time;
+                    barsSelect.value = decompressed.bars;
+                    compositionNotes.value = "";
+                    
+                    var options = timeSigConfig[decompressed.time].subs;
+                    subdivisionSelect.innerHTML = '';
+                    for (var i = 0; i < options.length; i++) {
+                        var opt = document.createElement('option');
+                        opt.value = options[i].v;
+                        opt.textContent = options[i].l;
+                        subdivisionSelect.appendChild(opt);
+                    }
+                    subdivisionSelect.value = decompressed.sub;
+                    
+                    liveInstrumentsMemory = [];
+                    var savedData = {};
+                    
+                    for (var i = 0; i < decompressed.tracks.length; i++) {
+                        var t = decompressed.tracks[i];
+                        liveInstrumentsMemory.push({
+                            id: t.id,
+                            defaultName: t.name,
+                            symbol: t.sym
+                        });
+                        savedData[t.id] = t.notes || [];
+                    }
+                    
+                    buildNotationGrid();
+                    restoreNotes(savedData);
+                } else {
+                    document.title = projectTitle.value;
+                    compositionNotes.value = "";
+                    updateSubdivisionDropdown();
+                    handleConfigurationLifecycle(true);
+                }
+            } else if (params.has('tracks')) {
                 var titleVal = params.get('title') || "My Drum Groove Composition";
                 var timeVal = params.get('time') || "4/4";
                 var barsVal = params.get('bars') || "2";
