@@ -118,20 +118,22 @@
                     var stateBits = stateMap[note.s] || 0;
                     var accentBit = (note.a) ? 1 : 0;
                     
-                    // Encode as: offset (high bits) + state (2 bits) + accent (1 bit)
-                    // For offsets < 32: single byte; for >= 32: two bytes with continuation bit
+                    // Encode as: offset (variable length) + state (2 bits) + accent (1 bit)
+                    // For offsets < 32: single byte = [offset(5) | state(2) | accent(1)]
+                    // For offsets >= 32: two bytes = [0x80 | lo7(offset), hi8(offset) | state(2) | accent(1)]
                     if (offset < 32) {
                         noteParts.push((offset << 3) | (stateBits << 1) | accentBit);
                     } else {
-                        noteParts.push(0x80 | (offset & 0x7F));
-                        noteParts.push(((offset >> 7) & 0x3F) | (stateBits << 6) | (accentBit << 8));
+                        // Multi-byte encoding: split offset across bytes, state and accent in second byte
+                        noteParts.push(0x80 | (offset & 0x7F));  // First byte: continuation bit + low 7 bits of offset
+                        var offsetHi = (offset >> 7) & 0x1F;  // High bits of offset (5 bits max for 12-bit offset)
+                        noteParts.push((offsetHi << 3) | (stateBits << 1) | accentBit);  // Second byte: high offset | state | accent
                     }
                     lastIdx = idx;
                 }
                 
-                // Pack track header: symbol (3 bits) + note count (8 bits for up to 256 notes)
-                data.push((symIndex << 5) | (noteParts.length >> 3));
-                data.push((noteParts.length & 0x07) << 5);
+                // Pack track header: symbol (3 bits) + note count (5 bits, max 31 notes per track)
+                data.push((symIndex << 5) | Math.min(noteParts.length, 31));
                 
                 // Add note data
                 for (var np = 0; np < noteParts.length; np++) {
@@ -196,13 +198,10 @@
                 var decompTracks = [];
                 
                 for (var t = 0; t < trackCount && t < liveInstrumentsMemory.length; t++) {
-                    var trackHeader1 = allData.charCodeAt(idx++);
-                    var trackHeader2 = allData.charCodeAt(idx++);
-                    var symIndex = (trackHeader1 >> 5) & 0x7;
-                    var noteCountHi = (trackHeader1 & 0x1F);
-                    var noteCountLo = (trackHeader2 >> 5) & 0x7;
-                    var noteCount = (noteCountHi << 3) | noteCountLo;
-                    
+                    var trackByte = allData.charCodeAt(idx++);
+                    var symIndex = (trackByte >> 5) & 0x7;
+                    var noteCount = trackByte & 0x1F;  // 5 bits for note count
+            
                     var decompNotes = [];
                     var lastIdx = -1;
                     var stateReverseMap = {0: 'A', 1: 'R', 2: 'L'};
@@ -214,9 +213,11 @@
                         if (b1 & 0x80) {
                             // Multi-byte encoding
                             var b2 = allData.charCodeAt(idx++);
-                            offset = (b1 & 0x7F) | ((b2 & 0x3F) << 7);
-                            stateBits = (b2 >> 6) & 0x3;
-                            accentBit = (b2 >> 8) & 0x1;
+                            var offsetLo = b1 & 0x7F;
+                            var offsetHi = (b2 >> 3) & 0x1F;
+                            offset = offsetLo | (offsetHi << 7);
+                            stateBits = (b2 >> 1) & 0x3;
+                            accentBit = b2 & 0x1;
                         } else {
                             // Single-byte encoding
                             offset = (b1 >> 3) & 0x1F;
