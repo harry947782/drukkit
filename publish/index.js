@@ -40,6 +40,7 @@
         var globalCachedGridTemplate = "";
         var globalCachedTotalSteps = 0;
         var dragSrcRow = null;
+        var defaultProjectTitle = "My Drum Groove Composition";
 
         function getSanitizedBarsCount() {
             var val = parseInt(barsSelect.value, 10);
@@ -69,7 +70,7 @@
             var timeBits = timeMap[timeVal] || 0;
             var barsBits = (parseInt(barsVal, 10) - 1) & 0xF;
             var subBits = subMap[subVal] || 3;
-            var hasTitle = (titleVal && titleVal !== 'My Drum Groove Composition') ? 1 : 0;
+            var hasTitle = (titleVal && titleVal !== defaultProjectTitle) ? 1 : 0;
             var hasNotes = (notesVal && notesVal.length > 0) ? 1 : 0;
             
             var metadata = (timeBits << 6) | (barsBits << 2) | (subBits << 0) | (hasTitle << 8) | (hasNotes << 9);
@@ -168,7 +169,7 @@
                 var timeVal = timeReverseMap[timeBits];
                 var barsVal = String(barsBits + 1);
                 var subVal = subReverseMap[subBits];
-                var titleVal = 'My Drum Groove Composition';
+                var titleVal = defaultProjectTitle;
                 var notesVal = '';
                 
                 // Decode title if present
@@ -1001,8 +1002,8 @@
             if (params.has('c')) {
                 var decompressed = decompressState(params.get('c'));
                 if (decompressed) {
-                    projectTitle.value = decompressed.title || "My Drum Groove Composition";
-                    document.title = decompressed.title || "My Drum Groove Composition";
+                    projectTitle.value = decompressed.title || defaultProjectTitle;
+                    document.title = decompressed.title || defaultProjectTitle;
                     timeSigSelect.value = decompressed.time;
                     barsSelect.value = decompressed.bars;
                     compositionNotes.value = decompressed.notes || "";
@@ -1039,7 +1040,7 @@
                     handleConfigurationLifecycle(true);
                 }
             } else if (params.has('tracks')) {
-                var titleVal = params.get('title') || "My Drum Groove Composition";
+                var titleVal = params.get('title') || defaultProjectTitle;
                 var timeVal = params.get('time') || "4/4";
                 var barsVal = params.get('bars') || "2";
                 var subVal = params.get('sub') || "16th";
