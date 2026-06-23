@@ -1128,6 +1128,212 @@
             updateURL();
         }
 
+        // --- localStorage Groove Management Functions ---
+        
+        // Get all saved grooves from localStorage
+        function getAllSavedGrooves() {
+            try {
+                var groovesJson = localStorage.getItem('drukkit_grooves');
+                if (!groovesJson) return [];
+                return JSON.parse(groovesJson);
+            } catch (e) {
+                console.error("Failed to parse saved grooves", e);
+                return [];
+            }
+        }
+
+        // Save current groove to localStorage
+        function saveGrooveToStorage(name) {
+            try {
+                var titleVal = projectTitle.value;
+                var timeVal = timeSigSelect.value;
+                var barsVal = barsSelect.value;
+                var subVal = subdivisionSelect.value;
+                var notesVal = compositionNotes.value;
+                
+                var savedNotes = extractCurrentNotes(); 
+                var tracksPayload = liveInstrumentsMemory.map(function(inst) {
+                    return {
+                        id: inst.id,
+                        name: inst.defaultName,
+                        sym: inst.symbol,
+                        notes: savedNotes[inst.id] || []
+                    };
+                });
+
+                var grooveData = {
+                    id: new Date().getTime().toString() + Math.random().toString(36).substr(2, 9),
+                    name: name,
+                    timestamp: new Date().toISOString(),
+                    state: {
+                        title: titleVal,
+                        time: timeVal,
+                        bars: barsVal,
+                        sub: subVal,
+                        notes: notesVal,
+                        tracks: tracksPayload
+                    }
+                };
+
+                var allGrooves = getAllSavedGrooves();
+                allGrooves.push(grooveData);
+                localStorage.setItem('drukkit_grooves', JSON.stringify(allGrooves));
+                return true;
+            } catch (e) {
+                console.error("Failed to save groove", e);
+                alert('Failed to save groove. Check browser storage.');
+                return false;
+            }
+        }
+
+        // Load a groove from localStorage
+        function loadGrooveFromStorage(grooveId) {
+            try {
+                var allGrooves = getAllSavedGrooves();
+                var groove = allGrooves.find(function(g) { return g.id === grooveId; });
+                if (!groove) {
+                    console.error("Groove not found");
+                    return false;
+                }
+
+                var state = groove.state;
+                projectTitle.value = state.title;
+                document.title = state.title;
+                timeSigSelect.value = state.time;
+                barsSelect.value = state.bars;
+                subdivisionSelect.value = state.sub;
+                compositionNotes.value = state.notes;
+
+                updateSubdivisionDropdown();
+                subdivisionSelect.value = state.sub;
+
+                liveInstrumentsMemory = [];
+                var savedData = {};
+                
+                for (var i = 0; i < state.tracks.length; i++) {
+                    var t = state.tracks[i];
+                    liveInstrumentsMemory.push({
+                        id: t.id,
+                        defaultName: t.name,
+                        symbol: t.sym
+                    });
+                    savedData[t.id] = t.notes || [];
+                }
+                
+                buildNotationGrid();
+                restoreNotes(savedData);
+                updateURL();
+                return true;
+            } catch (e) {
+                console.error("Failed to load groove", e);
+                alert('Failed to load groove.');
+                return false;
+            }
+        }
+
+        // Delete a groove from localStorage
+        function deleteGrooveFromStorage(grooveId) {
+            try {
+                var allGrooves = getAllSavedGrooves();
+                var filtered = allGrooves.filter(function(g) { return g.id !== grooveId; });
+                localStorage.setItem('drukkit_grooves', JSON.stringify(filtered));
+                return true;
+            } catch (e) {
+                console.error("Failed to delete groove", e);
+                return false;
+            }
+        }
+
+        // Format date for display
+        function formatGrooveDate(isoString) {
+            try {
+                var date = new Date(isoString);
+                var now = new Date();
+                var diffMs = now - date;
+                var diffMins = Math.floor(diffMs / 60000);
+                var diffHours = Math.floor(diffMs / 3600000);
+                var diffDays = Math.floor(diffMs / 86400000);
+
+                if (diffMins < 1) return "just now";
+                if (diffMins < 60) return diffMins + " min" + (diffMins > 1 ? "s" : "") + " ago";
+                if (diffHours < 24) return diffHours + " hour" + (diffHours > 1 ? "s" : "") + " ago";
+                if (diffDays < 7) return diffDays + " day" + (diffDays > 1 ? "s" : "") + " ago";
+                
+                return date.toLocaleDateString() + " " + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            } catch (e) {
+                return "unknown";
+            }
+        }
+
+        // Refresh the grooves list in the modal
+        function refreshGroovesList() {
+            var groovesList = document.getElementById('groovesList');
+            var noGroovesMsg = document.getElementById('noGroovesMsg');
+            var allGrooves = getAllSavedGrooves();
+
+            if (allGrooves.length === 0) {
+                groovesList.innerHTML = '';
+                noGroovesMsg.style.display = 'block';
+                return;
+            }
+
+            noGroovesMsg.style.display = 'none';
+            groovesList.innerHTML = '';
+
+            for (var i = allGrooves.length - 1; i >= 0; i--) {
+                var groove = allGrooves[i];
+                var item = document.createElement('div');
+                item.className = 'groove-item';
+
+                var info = document.createElement('div');
+                info.className = 'groove-item-info';
+
+                var nameEl = document.createElement('div');
+                nameEl.className = 'groove-item-name';
+                nameEl.textContent = groove.name;
+                info.appendChild(nameEl);
+
+                var metaEl = document.createElement('div');
+                metaEl.className = 'groove-item-meta';
+                metaEl.textContent = groove.state.time + " / " + groove.state.bars + " bars / " + groove.state.sub + " • " + formatGrooveDate(groove.timestamp);
+                info.appendChild(metaEl);
+
+                item.appendChild(info);
+
+                var actions = document.createElement('div');
+                actions.className = 'groove-item-actions';
+
+                var loadBtn = document.createElement('button');
+                loadBtn.className = 'groove-load-btn';
+                loadBtn.textContent = 'Load';
+                loadBtn.onclick = (function(id) {
+                    return function() {
+                        if (loadGrooveFromStorage(id)) {
+                            var loadModal = document.getElementById('loadModal');
+                            loadModal.style.display = 'none';
+                        }
+                    };
+                })(groove.id);
+                actions.appendChild(loadBtn);
+
+                var deleteBtn = document.createElement('button');
+                deleteBtn.className = 'groove-delete-btn';
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.onclick = (function(id) {
+                    return function() {
+                        if (confirm('Are you sure you want to delete this groove?')) {
+                            deleteGrooveFromStorage(id);
+                            refreshGroovesList();
+                        }
+                    };
+                })(groove.id);
+                actions.appendChild(deleteBtn);
+
+                item.appendChild(actions);
+                groovesList.appendChild(item);
+            }
+        }
+
         // --- Event Listeners ---
         projectTitle.oninput = function() {
             document.title = this.value;
@@ -1191,6 +1397,70 @@
         var themeBtn = document.getElementById('themeBtn');
         themeBtn.onclick = function() {
             document.body.classList.toggle('light-mode');
+        };
+
+        // --- Save/Load Groove Event Listeners ---
+
+        // Save button
+        document.getElementById('saveBtn').onclick = function() {
+            var saveDialog = document.getElementById('saveDialog');
+            var grooveNameInput = document.getElementById('grooveName');
+            grooveNameInput.value = projectTitle.value;
+            saveDialog.style.display = 'flex';
+            grooveNameInput.focus();
+        };
+
+        // Save dialog cancel button
+        document.getElementById('saveCancelBtn').onclick = function() {
+            document.getElementById('saveDialog').style.display = 'none';
+        };
+
+        // Save dialog confirm button
+        document.getElementById('saveConfirmBtn').onclick = function() {
+            var grooveNameInput = document.getElementById('grooveName');
+            var name = grooveNameInput.value.trim();
+            
+            if (!name) {
+                alert('Please enter a groove name');
+                return;
+            }
+
+            if (saveGrooveToStorage(name)) {
+                document.getElementById('saveDialog').style.display = 'none';
+                alert('Groove saved successfully!');
+            }
+        };
+
+        // Allow Enter key to submit save dialog
+        document.getElementById('grooveName').onkeypress = function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('saveConfirmBtn').click();
+            }
+        };
+
+        // Load button
+        document.getElementById('loadBtn').onclick = function() {
+            refreshGroovesList();
+            document.getElementById('loadModal').style.display = 'flex';
+        };
+
+        // Modal close button
+        document.getElementById('modalClose').onclick = function() {
+            document.getElementById('loadModal').style.display = 'none';
+        };
+
+        // Close modal when clicking outside content
+        document.getElementById('loadModal').onclick = function(e) {
+            if (e.target === this) {
+                this.style.display = 'none';
+            }
+        };
+
+        // Close save dialog when clicking outside content
+        document.getElementById('saveDialog').onclick = function(e) {
+            if (e.target === this) {
+                this.style.display = 'none';
+            }
         };
 
         // Initialize App Runtime

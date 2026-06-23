@@ -37,12 +37,42 @@
 
             <button class="theme-btn" id="themeBtn">Theme</button>
             <button class="clear-btn" id="clearBtn">Clear</button>
+            <button class="save-btn" id="saveBtn">Save Groove</button>
+            <button class="load-btn" id="loadBtn">Load Groove</button>
         </div>
 
         <div class="print-qr-container">
             <img id="printQrCode" src="" alt="Drukkit Layout Save Code">
         </div>
     </header>
+
+    <!-- Modal for displaying saved grooves -->
+    <div class="modal" id="loadModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Load Saved Groove</h2>
+                <button class="modal-close" id="modalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="groovesList" class="grooves-list">
+                    <!-- Saved grooves will be listed here -->
+                </div>
+                <div id="noGroovesMsg" class="no-grooves-msg">No saved grooves yet. Save your first groove!</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dialog for saving a groove -->
+    <div class="save-dialog" id="saveDialog" style="display: none;">
+        <div class="save-dialog-content">
+            <h2>Save Groove</h2>
+            <input type="text" id="grooveName" class="save-dialog-input" placeholder="Enter groove name..." maxlength="100">
+            <div class="save-dialog-actions">
+                <button id="saveCancelBtn" class="save-dialog-btn save-dialog-cancel">Cancel</button>
+                <button id="saveConfirmBtn" class="save-dialog-btn save-dialog-save">Save</button>
+            </div>
+        </div>
+    </div>
 
     <div class="notation-container">
         <div class="notation-grid-wrapper" id="notationGrid"></div>

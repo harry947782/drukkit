@@ -278,3 +278,207 @@ test('reorders tracks and persists the new order in the share payload', async ({
     return page.evaluate(() => JSON.parse(new URLSearchParams(window.location.search).get('tracks')).map((track) => track.id));
   }).toEqual(['hihat', 'bass', 'snare']);
 });
+
+test('save groove to localStorage and load it back', async ({ page }) => {
+  // Navigate to app and clear localStorage via the page
+  await gotoApp(page);
+  
+  await page.evaluate(() => {
+    try { localStorage.clear(); } catch (e) { }
+  });
+
+  // Set up the groove with some modifications
+  const titleInput = page.locator('#projectTitle');
+  await titleInput.fill('Test Groove');
+
+  // Click some steps to create a pattern
+  await clickStep(page, 'hihat', 0);
+  await clickStep(page, 'snare', 4);
+
+  // Save the groove
+  const saveBtn = page.getByRole('button', { name: 'Save Groove' });
+  await saveBtn.click();
+
+  // Enter groove name in save dialog
+  const grooveNameInput = page.locator('#grooveName');
+  await expect(grooveNameInput).toBeVisible();
+  await grooveNameInput.fill('My Test Groove');
+
+  // Click save confirm and handle alert
+  const saveConfirmBtn = page.locator('#saveConfirmBtn');
+  page.once('dialog', dialog => dialog.accept());
+  await saveConfirmBtn.click();
+
+  // Give time for save dialog to close
+  await page.waitForTimeout(800);
+
+  // Verify save dialog is closed
+  const saveDialog = page.locator('#saveDialog');
+  await expect(saveDialog).toBeHidden();
+
+  // Load the groove back via load modal
+  const loadBtn = page.getByRole('button', { name: 'Load Groove' });
+  await loadBtn.click();
+
+  // Wait for the modal to appear
+  const loadModal = page.locator('#loadModal');
+  await expect(loadModal).toBeVisible();
+
+  // Check that the groove is listed
+  const grooveItems = page.locator('.groove-item');
+  await expect(grooveItems).toHaveCount(1);
+
+  // Click load button
+  const grooveLoadBtn = page.locator('.groove-load-btn').first();
+  await grooveLoadBtn.click();
+
+  // Wait for modal to close and time for page to update
+  await page.waitForTimeout(500);
+  await expect(loadModal).toBeHidden();
+
+  // Verify the groove was loaded
+  await expect(titleInput).toHaveValue('Test Groove');
+  
+  // Verify the steps were restored
+  await expect.poll(async () => {
+    return page.locator(stepSelector('hihat', 0)).evaluate((step) => step.classList.contains('active'));
+  }).toBe(true);
+});
+
+test('delete saved groove from localStorage', async ({ page }) => {
+  // Navigate to app and clear localStorage via the page
+  await gotoApp(page);
+  
+  await page.evaluate(() => {
+    try { localStorage.clear(); } catch (e) { }
+  });
+
+  // Save a groove
+  const titleInput = page.locator('#projectTitle');
+  await titleInput.fill('Groove to Delete');
+
+  const saveBtn = page.getByRole('button', { name: 'Save Groove' });
+  await saveBtn.click();
+
+  const grooveNameInput = page.locator('#grooveName');
+  await grooveNameInput.fill('Delete Me');
+
+  const saveConfirmBtn = page.locator('#saveConfirmBtn');
+  page.once('dialog', dialog => dialog.accept());
+  await saveConfirmBtn.click();
+
+  // Give time for save dialog to close
+  await page.waitForTimeout(800);
+
+  // Open load modal to see the groove
+  const loadBtn = page.getByRole('button', { name: 'Load Groove' });
+  await loadBtn.click();
+
+  const loadModal = page.locator('#loadModal');
+  await expect(loadModal).toBeVisible();
+
+  // Verify groove exists
+  const grooveItems = page.locator('.groove-item');
+  await expect(grooveItems).toHaveCount(1);
+
+  // Click delete button
+  const deleteBtn = page.locator('.groove-delete-btn').first();
+  
+  // Handle the confirmation dialog
+  page.once('dialog', dialog => dialog.accept());
+  await deleteBtn.click();
+
+  // Give time for deletion to process
+  await page.waitForTimeout(500);
+
+  // Verify groove is deleted - check the count should be 0
+  await expect(grooveItems).toHaveCount(0);
+  
+  // Verify "no grooves" message is shown
+  const noGroovesMsg = page.locator('#noGroovesMsg');
+  await expect(noGroovesMsg).toBeVisible();
+
+  // Close modal
+  const modalClose = page.locator('#modalClose');
+  await modalClose.click();
+  await expect(loadModal).toBeHidden();
+});
+
+test('multiple saves and loads work correctly', async ({ page }) => {
+  // Navigate to app and clear localStorage via the page
+  await gotoApp(page);
+  
+  await page.evaluate(() => {
+    try { localStorage.clear(); } catch (e) { }
+  });
+
+  // Save first groove
+  const titleInput = page.locator('#projectTitle');
+  await titleInput.fill('Groove 1');
+
+  await clickStep(page, 'hihat', 0);
+
+  let saveBtn = page.getByRole('button', { name: 'Save Groove' });
+  await saveBtn.click();
+
+  let grooveNameInput = page.locator('#grooveName');
+  await grooveNameInput.fill('First Groove');
+
+  let saveConfirmBtn = page.locator('#saveConfirmBtn');
+  page.once('dialog', dialog => dialog.accept());
+  await saveConfirmBtn.click();
+
+  // Give time for save dialog to close
+  await page.waitForTimeout(800);
+
+  // Clear and save second groove
+  let clearBtn = page.getByRole('button', { name: 'Clear' });
+  await clearBtn.click();
+
+  await titleInput.fill('Groove 2');
+  await clickStep(page, 'snare', 4);
+
+  saveBtn = page.getByRole('button', { name: 'Save Groove' });
+  await saveBtn.click();
+
+  grooveNameInput = page.locator('#grooveName');
+  await grooveNameInput.fill('Second Groove');
+
+  saveConfirmBtn = page.locator('#saveConfirmBtn');
+  page.once('dialog', dialog => dialog.accept());
+  await saveConfirmBtn.click();
+
+  // Give time for save dialog to close
+  await page.waitForTimeout(800);
+
+  // Open load modal
+  let loadBtn = page.getByRole('button', { name: 'Load Groove' });
+  await loadBtn.click();
+
+  let loadModal = page.locator('#loadModal');
+  await expect(loadModal).toBeVisible();
+
+  // Verify both grooves are listed
+  const grooveItems = page.locator('.groove-item');
+  await expect(grooveItems).toHaveCount(2);
+
+  // Get all groove names to identify them correctly
+  const firstGrooveNameText = await page.locator('.groove-item-name').first().textContent();
+  const secondGrooveNameText = await page.locator('.groove-item-name').last().textContent();
+
+  // Load the second groove (most recent - first in the list due to reverse order)
+  const loadBtns = page.locator('.groove-load-btn');
+  await loadBtns.first().click();
+
+  await page.waitForTimeout(500);
+  await expect(loadModal).toBeHidden();
+
+  // Verify the second groove is loaded
+  await expect(titleInput).toHaveValue('Groove 2');
+  
+  // Verify the step pattern from second groove
+  await expect.poll(async () => {
+    return page.locator(stepSelector('snare', 4)).evaluate((step) => step.classList.contains('active'));
+  }).toBe(true);
+});
+
