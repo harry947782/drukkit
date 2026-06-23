@@ -4,13 +4,13 @@ module.exports = defineConfig({
   testDir: './tests',
   fullyParallel: false,
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://127.0.0.1:4173',
     browserName: 'chromium',
     headless: true
   },
   webServer: {
-    command: 'node server.js',
-    url: 'http://localhost:3000',
+    command: 'node tests/serve.mjs',
+    url: 'http://127.0.0.1:4173',
     reuseExistingServer: !process.env.CI
   }
 });
