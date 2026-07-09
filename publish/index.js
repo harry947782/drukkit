@@ -1443,7 +1443,7 @@
                 var variantsPayload = buildVariantsPayload(savedVariants);
 
                 var grooveData = {
-                    id: new Date().getTime().toString() + Math.random().toString(36).substr(2, 9),
+                    id: new Date().getTime().toString() + Math.random().toString(36).slice(2, 11),
                     name: name,
                     timestamp: new Date().toISOString(),
                     state: {
