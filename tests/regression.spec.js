@@ -324,6 +324,8 @@ test('saves and reloads grooves with stacked variants', async ({ page }) => {
   await titleInput.fill('Test Groove');
   await page.locator('#compositionNotes').fill('Save both variants');
   await page.locator('.track-row[data-variant="1"][data-instrument="snare"] .instrument-label-input').fill('backbeat');
+  await expect(page.locator('.track-row[data-variant="0"][data-instrument="snare"] .instrument-label-input')).toHaveValue('backbeat');
+  await expect(page.locator('.track-row[data-variant="1"][data-instrument="snare"] .instrument-label-input')).toHaveValue('backbeat');
 
   await clickStep(page, 'hihat', 0, { variantIndex: 0 });
   await clickStep(page, 'snare', 4, { variantIndex: 1 });

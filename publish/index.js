@@ -46,6 +46,9 @@
         var defaultProjectTitle = "My Drum Groove Composition";
         var maxStepsForPortraitPrint = 16;
         var portraitPrintMaxWidth = 1400;
+        var msPerMinute = 60000;
+        var msPerHour = 60 * msPerMinute;
+        var msPerDay = 24 * msPerHour;
 
         function getSanitizedBarsCount() {
             var val = parseInt(barsSelect.value, 10);
@@ -1441,9 +1444,12 @@
                 var savedVariants = normalizeVariantNotesList(extractAllVariantNotes(), variantCount);
                 var tracksPayload = buildTracksPayload(savedVariants[0] || {});
                 var variantsPayload = buildVariantsPayload(savedVariants);
+                var grooveId = (window.crypto && typeof window.crypto.randomUUID === 'function')
+                    ? window.crypto.randomUUID()
+                    : new Date().getTime().toString() + Math.random().toString(36).slice(2, 11);
 
                 var grooveData = {
-                    id: new Date().getTime().toString() + Math.random().toString(36).slice(2, 11),
+                    id: grooveId,
                     name: name,
                     timestamp: new Date().toISOString(),
                     state: {
@@ -1552,9 +1558,9 @@
                 var date = new Date(isoString);
                 var now = new Date();
                 var diffMs = now - date;
-                var diffMins = Math.floor(diffMs / 60000);
-                var diffHours = Math.floor(diffMs / 3600000);
-                var diffDays = Math.floor(diffMs / 86400000);
+                var diffMins = Math.floor(diffMs / msPerMinute);
+                var diffHours = Math.floor(diffMs / msPerHour);
+                var diffDays = Math.floor(diffMs / msPerDay);
 
                 if (diffMins < 1) return "just now";
                 if (diffMins < 60) return diffMins + " min" + (diffMins > 1 ? "s" : "") + " ago";
@@ -1571,6 +1577,10 @@
             } catch (e) {
                 return "unknown";
             }
+        }
+
+        function formatGrooveMeta(groove) {
+            return `${groove.state.time} / ${groove.state.bars} bars / ${groove.state.sub} • ${formatGrooveDate(groove.timestamp)}`;
         }
 
         // Refresh the grooves list in the modal
@@ -1603,7 +1613,7 @@
 
                 var metaEl = document.createElement('div');
                 metaEl.className = 'groove-item-meta';
-                metaEl.textContent = groove.state.time + " / " + groove.state.bars + " bars / " + groove.state.sub + " • " + formatGrooveDate(groove.timestamp);
+                metaEl.textContent = formatGrooveMeta(groove);
                 info.appendChild(metaEl);
 
                 item.appendChild(info);
