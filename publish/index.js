@@ -47,6 +47,11 @@
         var maxStepsForPortraitPrint = 16;
         var portraitPrintMaxWidth = 1400;
 
+        var undoStack = [];
+        var redoStack = [];
+        var maxUndoHistorySize = 50;
+        var isApplyingSnapshot = false;
+
         function getSanitizedBarsCount() {
             var val = parseInt(barsSelect.value, 10);
             if (isNaN(val) || val < 1) return 1;
@@ -59,6 +64,83 @@
             if (isNaN(val) || val < 1) return 1;
             if (val > 8) return 8;
             return val;
+        }
+
+        function captureSnapshot() {
+            return {
+                title: projectTitle.value,
+                time: timeSigSelect.value,
+                bars: barsSelect.value,
+                variants: variantsSelect.value,
+                sub: subdivisionSelect.value,
+                notes: compositionNotes.value,
+                instruments: liveInstrumentsMemory.map(function(inst) {
+                    return { id: inst.id, defaultName: inst.defaultName, symbol: inst.symbol };
+                }),
+                variantNotes: extractAllVariantNotesStatic()
+            };
+        }
+
+        function extractAllVariantNotesStatic() {
+            var sections = document.querySelectorAll('.variant-section');
+            var totalVariants = sections.length || 1;
+            var savedVariants = [];
+            for (var v = 0; v < totalVariants; v++) {
+                savedVariants.push(extractCurrentNotes(v));
+            }
+            return savedVariants;
+        }
+
+        function pushUndoSnapshot() {
+            if (isApplyingSnapshot) return;
+            undoStack.push(captureSnapshot());
+            if (undoStack.length > maxUndoHistorySize) undoStack.shift();
+            redoStack = [];
+        }
+
+        function applySnapshot(snapshot) {
+            isApplyingSnapshot = true;
+
+            liveInstrumentsMemory = snapshot.instruments.map(function(inst) {
+                return { id: inst.id, defaultName: inst.defaultName, symbol: inst.symbol };
+            });
+
+            projectTitle.value = snapshot.title;
+            document.title = snapshot.title;
+            compositionNotes.value = snapshot.notes;
+            timeSigSelect.value = snapshot.time;
+            barsSelect.value = snapshot.bars;
+            variantsSelect.value = snapshot.variants;
+
+            var options = timeSigConfig[snapshot.time].subs;
+            subdivisionSelect.innerHTML = '';
+            for (var i = 0; i < options.length; i++) {
+                var opt = document.createElement('option');
+                opt.value = options[i].v;
+                opt.textContent = options[i].l;
+                subdivisionSelect.appendChild(opt);
+            }
+            subdivisionSelect.value = snapshot.sub;
+
+            buildNotationGrid();
+            var variantCount = parseInt(snapshot.variants, 10) || 1;
+            restoreAllVariantNotes(normalizeVariantNotesList(snapshot.variantNotes, variantCount));
+            updateNotesContainerClass();
+            updateURL();
+
+            isApplyingSnapshot = false;
+        }
+
+        function performUndo() {
+            if (undoStack.length === 0) return;
+            redoStack.push(captureSnapshot());
+            applySnapshot(undoStack.pop());
+        }
+
+        function performRedo() {
+            if (redoStack.length === 0) return;
+            undoStack.push(captureSnapshot());
+            applySnapshot(redoStack.pop());
         }
 
         function cloneNotesList(notesList) {
@@ -555,6 +637,7 @@
 
         function executeBarCopy(fromBarIdx, toBarIdx) {
             if (fromBarIdx === toBarIdx) return; 
+            pushUndoSnapshot();
 
             var sig = timeSigSelect.value;
             var subVal = subdivisionSelect.value;
@@ -595,6 +678,7 @@
         function executeBarDeletion(targetBarIdx) {
             var currentBars = getSanitizedBarsCount();
             if (currentBars <= 1) return; 
+            pushUndoSnapshot();
 
             var sig = timeSigSelect.value;
             var subVal = subdivisionSelect.value;
@@ -642,6 +726,7 @@
         function executeOuterBarAddition(type) {
             var currentBars = getSanitizedBarsCount();
             if (currentBars >= 16) return; 
+            pushUndoSnapshot();
 
             var sig = timeSigSelect.value;
             var subVal = subdivisionSelect.value;
@@ -927,6 +1012,7 @@
 
             symBtn.onclick = function(e) {
                 e.stopPropagation();
+                pushUndoSnapshot();
                 var oldSymbol = inst.symbol;
                 var nextIdx = (findSymIndex(inst.symbol) + 1) % symOptions.length;
                 inst.symbol = symOptions[nextIdx].v;
@@ -949,6 +1035,7 @@
             input.classList.add('instrument-label-input');
             input.value = inst.defaultName;
             input.oninput = function() {
+                pushUndoSnapshot();
                 inst.defaultName = this.value;
                 var peerInputs = document.querySelectorAll('.track-row[data-instrument="' + inst.id + '"] .instrument-label-input');
                 for (var p = 0; p < peerInputs.length; p++) {
@@ -965,6 +1052,7 @@
             delBtn.innerHTML = '&times;';
             delBtn.title = "Delete Track";
             delBtn.onclick = function() {
+                pushUndoSnapshot();
                 for (var m = 0; m < liveInstrumentsMemory.length; m++) {
                     if (liveInstrumentsMemory[m].id === inst.id) {
                         liveInstrumentsMemory.splice(m, 1);
@@ -1020,6 +1108,7 @@
             row.ondrop = function(e) {
                 if (!dragSrcRow || dragSrcRow === row) return;
                 e.preventDefault();
+                pushUndoSnapshot();
                 var insertAbove = row.classList.contains('drag-over-above');
                 row.classList.remove('drag-over-above', 'drag-over-below');
                 moveInstrumentToIndex(
@@ -1066,6 +1155,7 @@
                         // Tapping the top 30% of an active cell toggles the accent mark (mobile-friendly
                         // alternative to right-click for touch devices that lack a secondary tap).
                         step.onclick = function(e) {
+                            pushUndoSnapshot();
                             var isTopZone = (e.offsetY / this.offsetHeight) < 0.30;
                             var hasSymbol = this.classList.contains('active') || this.classList.contains('hand-R') || this.classList.contains('hand-L');
                             if (isTopZone && hasSymbol) {
@@ -1088,6 +1178,7 @@
                         step.oncontextmenu = function(e) {
                             e.preventDefault();
                             if (this.classList.contains('active') || this.classList.contains('hand-R') || this.classList.contains('hand-L')) {
+                                pushUndoSnapshot();
                                 this.classList.toggle('accent');
                                 updateURL();
                             }
@@ -1412,38 +1503,45 @@
 
         // --- Event Listeners ---
         projectTitle.oninput = function() {
+            pushUndoSnapshot();
             document.title = this.value;
             updateURL();
         };
 
         compositionNotes.oninput = function() {
+            pushUndoSnapshot();
             updateNotesContainerClass();
             updateURL();
         };
 
         timeSigSelect.onchange = function() {
+            pushUndoSnapshot();
             updateSubdivisionDropdown();
             handleConfigurationLifecycle(true);
             updateURL();
         };
 
         barsSelect.oninput = function() {
+            pushUndoSnapshot();
             handleConfigurationLifecycle(false); 
             updateURL();
         };
 
         variantsSelect.oninput = function() {
+            pushUndoSnapshot();
             this.value = getSanitizedVariantsCount();
             handleConfigurationLifecycle(false);
             updateURL();
         };
 
         subdivisionSelect.onchange = function() {
+            pushUndoSnapshot();
             handleConfigurationLifecycle(true);
             updateURL();
         };
 
         addTrackBtn.onclick = function() {
+            pushUndoSnapshot();
             var sig = timeSigSelect.value;
             var currentSigConfig = timeSigConfig[sig];
             var totalBars = getSanitizedBarsCount();
@@ -1463,6 +1561,7 @@
         };
 
         document.getElementById('clearBtn').onclick = function() {
+            pushUndoSnapshot();
             var allSteps = document.querySelectorAll('.step');
             for (var i = 0; i < allSteps.length; i++) {
                 allSteps[i].classList.remove('active', 'hand-R', 'hand-L', 'accent');
@@ -1489,6 +1588,19 @@
             if (event.key === 'Escape' && !headerMenuPanel.hidden) {
                 setHeaderMenuOpen(false);
                 headerMenuBtn.focus();
+            }
+
+            var tag = event.target.tagName;
+            var isTypingField = tag === 'INPUT' || tag === 'TEXTAREA';
+            if (isTypingField) return;
+
+            var ctrl = event.ctrlKey || event.metaKey;
+            if (ctrl && !event.shiftKey && event.key === 'z') {
+                event.preventDefault();
+                performUndo();
+            } else if (ctrl && (event.key === 'y' || (event.shiftKey && event.key.toLowerCase() === 'z'))) {
+                event.preventDefault();
+                performRedo();
             }
         });
 
