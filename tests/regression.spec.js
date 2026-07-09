@@ -318,11 +318,15 @@ test('save groove to localStorage and load it back', async ({ page }) => {
   const titleInput = page.locator('#projectTitle');
   await titleInput.fill('Test Groove');
 
+  // Clear the grid first so we start from an empty state
+  await clearGrid(page);
+
   // Click some steps to create a pattern
   await clickStep(page, 'hihat', 0);
   await clickStep(page, 'snare', 4);
 
   // Save the groove
+  await openHeaderMenu(page);
   const saveBtn = page.getByRole('button', { name: 'Save Groove' });
   await saveBtn.click();
 
@@ -344,6 +348,7 @@ test('save groove to localStorage and load it back', async ({ page }) => {
   await expect(saveDialog).toBeHidden();
 
   // Load the groove back via load modal
+  await openHeaderMenu(page);
   const loadBtn = page.getByRole('button', { name: 'Load Groove' });
   await loadBtn.click();
 
@@ -384,6 +389,7 @@ test('delete saved groove from localStorage', async ({ page }) => {
   const titleInput = page.locator('#projectTitle');
   await titleInput.fill('Groove to Delete');
 
+  await openHeaderMenu(page);
   const saveBtn = page.getByRole('button', { name: 'Save Groove' });
   await saveBtn.click();
 
@@ -398,6 +404,7 @@ test('delete saved groove from localStorage', async ({ page }) => {
   await page.waitForTimeout(800);
 
   // Open load modal to see the groove
+  await openHeaderMenu(page);
   const loadBtn = page.getByRole('button', { name: 'Load Groove' });
   await loadBtn.click();
 
@@ -445,6 +452,7 @@ test('multiple saves and loads work correctly', async ({ page }) => {
 
   await clickStep(page, 'hihat', 0);
 
+  await openHeaderMenu(page);
   let saveBtn = page.getByRole('button', { name: 'Save Groove' });
   await saveBtn.click();
 
@@ -459,12 +467,12 @@ test('multiple saves and loads work correctly', async ({ page }) => {
   await page.waitForTimeout(800);
 
   // Clear and save second groove
-  let clearBtn = page.getByRole('button', { name: 'Clear' });
-  await clearBtn.click();
+  await clearGrid(page);
 
   await titleInput.fill('Groove 2');
   await clickStep(page, 'snare', 4);
 
+  await openHeaderMenu(page);
   saveBtn = page.getByRole('button', { name: 'Save Groove' });
   await saveBtn.click();
 
@@ -479,6 +487,7 @@ test('multiple saves and loads work correctly', async ({ page }) => {
   await page.waitForTimeout(800);
 
   // Open load modal
+  await openHeaderMenu(page);
   let loadBtn = page.getByRole('button', { name: 'Load Groove' });
   await loadBtn.click();
 

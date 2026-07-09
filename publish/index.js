@@ -1423,7 +1423,6 @@
             document.body.classList.toggle('light-mode');
         };
 
-<<<<<<< HEAD
         // --- Save/Load Groove Event Listeners ---
 
         // Save button
@@ -1487,7 +1486,7 @@
                 this.style.display = 'none';
             }
         };
-=======
+
         headerMenuBtn.onclick = function() {
             toggleHeaderMenu();
         };
@@ -1504,7 +1503,6 @@
                 headerMenuBtn.focus();
             }
         });
->>>>>>> origin/main
 
         // Initialize App Runtime
         initFromURLOrDefaults();
