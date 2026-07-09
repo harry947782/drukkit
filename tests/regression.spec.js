@@ -358,6 +358,7 @@ test('uses print-safe variant sections and portrait mode for narrow stacked layo
   await page.locator('#variantsSelect').fill('3');
 
   await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+  await expect(page.locator('body')).toHaveClass(/print-portrait/);
   await page.emulateMedia({ media: 'print' });
 
   await expect(page.locator('body')).toHaveClass(/print-portrait/);

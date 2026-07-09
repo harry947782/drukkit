@@ -803,6 +803,7 @@
 
             .variant-section {
                 gap: 14px !important;
+                /* Keep variants intact across browser print engines that still rely on legacy page-break syntax. */
                 break-inside: avoid-page !important;
                 page-break-inside: avoid !important;
                 border-top: 1px solid #d0d0d0 !important;

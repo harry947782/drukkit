@@ -44,6 +44,8 @@
         var globalCachedTotalSteps = 0;
         var dragSrcRow = null;
         var defaultProjectTitle = "My Drum Groove Composition";
+        var maxStepsForPortraitPrint = 16;
+        var portraitPrintMaxWidth = 1400;
 
         function getSanitizedBarsCount() {
             var val = parseInt(barsSelect.value, 10);
@@ -62,11 +64,16 @@
         function cloneNotesList(notesList) {
             var cloned = [];
             for (var i = 0; i < notesList.length; i++) {
-                cloned.push({
+                if (typeof notesList[i] !== 'object') {
+                    cloned.push(notesList[i]);
+                    continue;
+                }
+                var clonedNote = {
                     i: notesList[i].i,
-                    s: notesList[i].s,
-                    a: notesList[i].a
-                });
+                    s: notesList[i].s
+                };
+                if (notesList[i].a) clonedNote.a = 1;
+                cloned.push(clonedNote);
             }
             return cloned;
         }
@@ -165,7 +172,7 @@
                 var accentBit = (note.a) ? 1 : 0;
 
                 if (offset > 4095) {
-                    console.warn('Note offset ' + offset + ' exceeds maximum 4095, compression may be lossy');
+                    console.warn('Note offset ' + offset + ' exceeds the 4095-step QR compression limit, so very sparse notes may not round-trip exactly in compressed share links.');
                 }
 
                 if (offset < 32) {
@@ -234,14 +241,13 @@
 
         // Compression/decompression functions for QR code URL optimization
         function compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload) {
-            // Encode metadata: time (2 bits) + bars (4 bits) + sub (2 bits) + hasTitle (1 bit) + hasNotes (1 bit)
             // Bit layout (16-bit value):
+            //   Bits 10-13: variant count - 1 (4 bits: supports 1-16 variants)
             //   Bit 9:  hasNotes flag
             //   Bit 8:  hasTitle flag
             //   Bits 6-7: time signature (2 bits: 0=4/4, 1=3/4, 2=2/2, 3=6/8)
             //   Bits 2-5: bars count - 1 (4 bits: supports 1-16 bars)
             //   Bits 0-1: subdivision (2 bits: 0=quarter, 1=8th, 2=12th, 3=16th)
-            //   Bits 10-13: variant count - 1 (4 bits: supports 1-16 variants)
             var timeMap = {'4/4': 0, '3/4': 1, '2/2': 2, '6/8': 3};
             var subMap = {'quarter': 0, '8th': 1, '12th': 2, '16th': 3};
             var timeBits = timeMap[timeVal] || 0;
@@ -857,7 +863,6 @@
             var variantSection = document.createElement('section');
             variantSection.classList.add('variant-section');
             variantSection.setAttribute('data-variant', variantIndex);
-            variantSection.setAttribute('data-variant-name', 'Variant ' + (variantIndex + 1));
 
             var heading = document.createElement('div');
             heading.classList.add('variant-heading');
@@ -877,7 +882,10 @@
                 if (liveInstrumentsMemory[i].id === targetInstId) targetIndex = i;
             }
 
-            if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) return;
+            if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) {
+                console.warn('Unable to reorder track because the source or target instrument was not found.');
+                return;
+            }
 
             var moved = liveInstrumentsMemory.splice(sourceIndex, 1)[0];
             if (sourceIndex < targetIndex) targetIndex--;
@@ -1219,7 +1227,7 @@
             document.body.classList.remove('print-portrait', 'print-landscape');
             var shouldUsePortrait = false;
             var firstGrid = document.querySelector('.variant-section .grid-steps');
-            var isNarrowEnough = globalCachedTotalSteps <= 16 || (firstGrid && getSanitizedBarsCount() <= 2 && firstGrid.scrollWidth <= 1400);
+            var isNarrowEnough = globalCachedTotalSteps <= maxStepsForPortraitPrint || (firstGrid && getSanitizedBarsCount() <= 2 && firstGrid.scrollWidth <= portraitPrintMaxWidth);
             if (getSanitizedVariantsCount() > 1 && isNarrowEnough) {
                 shouldUsePortrait = true;
             }
@@ -1305,6 +1313,7 @@
                             savedVariants[0][decompressed.tracks[k].id] = decompressed.tracks[k].notes || [];
                         }
                     }
+                    savedVariants = normalizeVariantNotesList(savedVariants, getSanitizedVariantsCount());
                     
                     buildNotationGrid();
                     restoreAllVariantNotes(savedVariants);
@@ -1369,6 +1378,7 @@
                         variantsSelect.value = defaultVariantCount;
                         savedVariants.push(sharedNotes);
                     }
+                    savedVariants = normalizeVariantNotesList(savedVariants, getSanitizedVariantsCount());
                     
                     buildNotationGrid();
                     restoreAllVariantNotes(savedVariants);
