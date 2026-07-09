@@ -297,6 +297,24 @@
             gap: 48px; 
         }
 
+        .variant-section {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            padding-top: 4px;
+            border-top: 1px solid var(--step-border);
+        }
+
+        .variant-heading {
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: var(--accent-color);
+            opacity: 0.85;
+            padding-left: 2px;
+        }
+
         .track-row {
             display: flex;
             gap: 15px;
@@ -701,15 +719,31 @@
            🖨️ HARD SAFETY PRINT-MODE CONFIGURATION STYLES
            ========================================================================== */
         @media print {
-            /* Force Default Page Printing to Landscape Formats and Suppress Browser Metadata (Headers/Footers) */
             @page {
-                size: landscape;
                 margin: 0; 
+            }
+
+            @page landscapePage {
+                size: landscape;
+                margin: 0;
+            }
+
+            @page portraitPage {
+                size: portrait;
+                margin: 0;
             }
 
             * {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
+            }
+
+            body.print-landscape {
+                page: landscapePage;
+            }
+
+            body.print-portrait {
+                page: portraitPage;
             }
 
             body {
@@ -765,6 +799,20 @@
 
             .notation-grid-wrapper {
                 gap: 36px !important; 
+            }
+
+            .variant-section {
+                gap: 14px !important;
+                break-inside: avoid-page !important;
+                page-break-inside: avoid !important;
+                border-top: 1px solid #d0d0d0 !important;
+                padding-top: 8px !important;
+            }
+
+            .variant-heading {
+                color: #000000 !important;
+                break-after: avoid-page !important;
+                page-break-after: avoid !important;
             }
 
             .track-row.header-row {

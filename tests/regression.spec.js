@@ -18,14 +18,19 @@ async function clearGrid(page) {
   await page.getByRole('button', { name: 'Clear' }).click();
 }
 
-function stepSelector(trackId, stepIndex) {
-  return `.track-row[data-instrument="${trackId}"] .step[data-step="${stepIndex}"]`;
+function trackSelector(trackId, variantIndex = 0) {
+  return `.track-row[data-variant="${variantIndex}"][data-instrument="${trackId}"]`;
+}
+
+function stepSelector(trackId, stepIndex, variantIndex = 0) {
+  return `${trackSelector(trackId, variantIndex)} .step[data-step="${stepIndex}"]`;
 }
 
 async function clickStep(page, trackId, stepIndex, options = {}) {
   const position = options.position || { x: 12, y: 28 };
   const button = options.button || 'left';
-  await page.locator(stepSelector(trackId, stepIndex)).evaluate((step, payload) => {
+  const variantIndex = options.variantIndex || 0;
+  await page.locator(stepSelector(trackId, stepIndex, variantIndex)).evaluate((step, payload) => {
     const type = payload.button === 'right' ? 'contextmenu' : 'click';
     const event = new MouseEvent(type, {
       bubbles: true,
@@ -44,8 +49,8 @@ async function clickStep(page, trackId, stepIndex, options = {}) {
   }, { button, position });
 }
 
-async function stepClasses(page, trackId, stepIndex) {
-  return page.locator(stepSelector(trackId, stepIndex)).evaluate((step) => ({
+async function stepClasses(page, trackId, stepIndex, variantIndex = 0) {
+  return page.locator(stepSelector(trackId, stepIndex, variantIndex)).evaluate((step) => ({
     active: step.classList.contains('active'),
     right: step.classList.contains('hand-R'),
     left: step.classList.contains('hand-L'),
@@ -53,23 +58,23 @@ async function stepClasses(page, trackId, stepIndex) {
   }));
 }
 
-async function activeSteps(page, trackId) {
-  return page.evaluate((id) => {
-    return Array.from(document.querySelectorAll(`.track-row[data-instrument="${id}"] .step`))
+async function activeSteps(page, trackId, variantIndex = 0) {
+  return page.evaluate(({ id, variant }) => {
+    return Array.from(document.querySelectorAll(`.track-row[data-variant="${variant}"][data-instrument="${id}"] .step`))
       .filter((step) => step.classList.contains('active') || step.classList.contains('hand-R') || step.classList.contains('hand-L'))
       .map((step) => ({
         index: Number(step.dataset.step),
         state: step.classList.contains('active') ? 'A' : step.classList.contains('hand-R') ? 'R' : 'L',
         accent: step.classList.contains('accent')
       }));
-  }, trackId);
+  }, { id: trackId, variant: variantIndex });
 }
 
 test('loads the default groove and share state', async ({ page }) => {
   await gotoApp(page);
 
   await expect(page.locator('.track-row.header-row')).toHaveCount(1);
-  await expect(page.locator('.track-row:not(.header-row)')).toHaveCount(3);
+  await expect(page.locator('.track-row[data-variant="0"]')).toHaveCount(3);
   await expect(page.locator('#headerMenuPanel')).toBeHidden();
   await expect(page.locator('#barsSelect')).toHaveValue('2');
   await expect(page.locator('#subdivisionSelect')).toHaveValue('16th');
@@ -155,8 +160,8 @@ test('serializes custom edits into the URL and restores them on reload', async (
 
   await page.locator('#projectTitle').fill('Linear Fusion');
   await page.locator('#compositionNotes').fill('Practice with alternating accents');
-  await page.locator('.track-row[data-instrument="snare"] .instrument-label-input').fill('backbeat');
-  await page.locator('.track-row[data-instrument="snare"] .symbol-cycle-btn').click();
+  await page.locator('.track-row[data-variant="0"][data-instrument="snare"] .instrument-label-input').fill('backbeat');
+  await page.locator('.track-row[data-variant="0"][data-instrument="snare"] .symbol-cycle-btn').click();
 
   await clickStep(page, 'snare', 2);
   await clickStep(page, 'snare', 2, { button: 'right' });
@@ -200,8 +205,8 @@ test('serializes custom edits into the URL and restores them on reload', async (
 
   await expect(page.locator('#projectTitle')).toHaveValue('Linear Fusion');
   await expect(page.locator('#compositionNotes')).toHaveValue('Practice with alternating accents');
-  await expect(page.locator('.track-row[data-instrument="snare"] .instrument-label-input')).toHaveValue('backbeat');
-  await expect(page.locator('.track-row[data-instrument="snare"] .symbol-cycle-btn')).toHaveText('✕');
+  await expect(page.locator('.track-row[data-variant="0"][data-instrument="snare"] .instrument-label-input')).toHaveValue('backbeat');
+  await expect(page.locator('.track-row[data-variant="0"][data-instrument="snare"] .symbol-cycle-btn')).toHaveText('✕');
   expect(await stepClasses(page, 'snare', 2)).toEqual({ active: true, right: false, left: false, accent: true });
   expect(await stepClasses(page, 'snare', 3)).toEqual({ active: false, right: true, left: false, accent: false });
   expect(await stepClasses(page, 'bass', 7)).toEqual({ active: false, right: false, left: true, accent: false });
@@ -292,16 +297,79 @@ test('hides delete controls when the chart has only one bar', async ({ page }) =
 test('reorders tracks and persists the new order in the share payload', async ({ page }) => {
   await gotoApp(page);
 
-  await page.locator('.track-row[data-instrument="bass"] .drag-handle').dragTo(
-    page.locator('.track-row[data-instrument="snare"]'),
+  await page.locator('.track-row[data-variant="0"][data-instrument="bass"] .drag-handle').dragTo(
+    page.locator('.track-row[data-variant="0"][data-instrument="snare"]'),
     { targetPosition: { x: 10, y: 2 } }
   );
 
   await expect.poll(async () => {
-    return page.locator('.track-row:not(.header-row)').evaluateAll((rows) => rows.map((row) => row.getAttribute('data-instrument')));
+    return page.locator('.track-row[data-variant="0"]').evaluateAll((rows) => rows.map((row) => row.getAttribute('data-instrument')));
   }).toEqual(['hihat', 'bass', 'snare']);
 
   await expect.poll(async () => {
     return page.evaluate(() => JSON.parse(new URLSearchParams(window.location.search).get('tracks')).map((track) => track.id));
   }).toEqual(['hihat', 'bass', 'snare']);
+});
+
+test('stacks groove variants with independent notes and shared track metadata', async ({ page }) => {
+  await gotoApp(page);
+  await clearGrid(page);
+  await openHeaderMenu(page);
+  await page.locator('#variantsSelect').fill('2');
+
+  await expect(page.locator('.variant-section')).toHaveCount(2);
+  await expect(page.locator('.track-row[data-variant="0"]')).toHaveCount(3);
+  await expect(page.locator('.track-row[data-variant="1"]')).toHaveCount(3);
+
+  await clickStep(page, 'hihat', 1, { variantIndex: 0 });
+  await clickStep(page, 'snare', 2, { variantIndex: 1 });
+  await clickStep(page, 'snare', 2, { variantIndex: 1 });
+
+  expect(await stepClasses(page, 'hihat', 1, 0)).toEqual({ active: true, right: false, left: false, accent: false });
+  expect(await stepClasses(page, 'hihat', 1, 1)).toEqual({ active: false, right: false, left: false, accent: false });
+  expect(await stepClasses(page, 'snare', 2, 1)).toEqual({ active: false, right: true, left: false, accent: false });
+
+  await page.locator('.track-row[data-variant="1"][data-instrument="snare"] .instrument-label-input').fill('backbeat');
+  await expect(page.locator('.track-row[data-variant="0"][data-instrument="snare"] .instrument-label-input')).toHaveValue('backbeat');
+  await expect(page.locator('.track-row[data-variant="1"][data-instrument="snare"] .instrument-label-input')).toHaveValue('backbeat');
+
+  const serialized = await page.evaluate(() => {
+    const params = new URLSearchParams(window.location.search);
+    return {
+      tracks: JSON.parse(params.get('tracks')),
+      variants: JSON.parse(params.get('variants'))
+    };
+  });
+
+  expect(serialized.tracks.find((track) => track.id === 'snare').name).toBe('backbeat');
+  expect(serialized.variants).toHaveLength(2);
+  expect(serialized.variants[0].tracks.find((track) => track.id === 'hihat').notes).toEqual([
+    { i: 1, s: 'A' }
+  ]);
+  expect(serialized.variants[1].tracks.find((track) => track.id === 'snare').notes).toEqual([
+    { i: 2, s: 'R' }
+  ]);
+});
+
+test('uses print-safe variant sections and portrait mode for narrow stacked layouts', async ({ page }) => {
+  await gotoApp(page);
+  await openHeaderMenu(page);
+  await page.locator('#barsSelect').fill('1');
+  await page.locator('#variantsSelect').fill('3');
+
+  await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+  await page.emulateMedia({ media: 'print' });
+
+  await expect(page.locator('body')).toHaveClass(/print-portrait/);
+
+  const printStyles = await page.locator('.variant-section').first().evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return {
+      breakInside: styles.breakInside,
+      pageBreakInside: styles.pageBreakInside
+    };
+  });
+
+  expect(printStyles.breakInside).toContain('avoid');
+  expect(printStyles.pageBreakInside).toContain('avoid');
 });
