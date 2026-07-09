@@ -103,7 +103,7 @@
             background-color: var(--panel-bg);
             padding: 12px 20px;
             display: flex;
-            align-items: center;
+            align-items: baseline;
             justify-content: space-between;
             border-bottom: 2px solid var(--step-border);
             transition: background-color 0.2s, border-color 0.2s;
@@ -150,6 +150,7 @@
         .header-menu {
             position: relative;
             flex-shrink: 0;
+            align-self: center;
         }
 
         .hamburger-btn {
