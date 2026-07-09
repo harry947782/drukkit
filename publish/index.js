@@ -1489,7 +1489,7 @@
                 updateSubdivisionDropdown();
                 subdivisionSelect.value = state.sub;
 
-                var sourceTracks = (state.variants && state.variants[0] && state.variants[0].tracks) || state.tracks || [];
+                var sourceTracks = state.tracks || (state.variants && state.variants[0] && state.variants[0].tracks) || [];
                 liveInstrumentsMemory = [];
                 for (var i = 0; i < sourceTracks.length; i++) {
                     var t = sourceTracks[i];

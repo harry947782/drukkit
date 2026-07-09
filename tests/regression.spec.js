@@ -329,6 +329,7 @@ test('saves and reloads grooves with stacked variants', async ({ page }) => {
   await clickStep(page, 'snare', 4, { variantIndex: 1 });
   await clickStep(page, 'snare', 4, { variantIndex: 1 });
 
+  await openHeaderMenu(page);
   await page.getByRole('button', { name: 'Save Groove' }).click();
   await expect(page.locator('#grooveName')).toBeVisible();
   await page.locator('#grooveName').fill('My Test Groove');
