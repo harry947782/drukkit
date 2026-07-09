@@ -49,6 +49,7 @@
         var msPerMinute = 60000;
         var msPerHour = 60 * msPerMinute;
         var msPerDay = 24 * msPerHour;
+        var grooveIdCounter = 0;
 
         function getSanitizedBarsCount() {
             var val = parseInt(barsSelect.value, 10);
@@ -1444,9 +1445,7 @@
                 var savedVariants = normalizeVariantNotesList(extractAllVariantNotes(), variantCount);
                 var tracksPayload = buildTracksPayload(savedVariants[0] || {});
                 var variantsPayload = buildVariantsPayload(savedVariants);
-                var grooveId = (window.crypto && typeof window.crypto.randomUUID === 'function')
-                    ? window.crypto.randomUUID()
-                    : new Date().getTime().toString() + Math.random().toString(36).slice(2, 11);
+                var grooveId = generateGrooveId();
 
                 var grooveData = {
                     id: grooveId,
@@ -1589,6 +1588,21 @@
             };
         }
 
+        function generateGrooveId() {
+            if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+                return window.crypto.randomUUID();
+            }
+
+            if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+                var randomValues = new Uint32Array(2);
+                window.crypto.getRandomValues(randomValues);
+                return 'groove-' + randomValues[0].toString(36) + randomValues[1].toString(36);
+            }
+
+            grooveIdCounter += 1;
+            return 'groove-' + new Date().getTime().toString(36) + '-' + grooveIdCounter.toString(36);
+        }
+
         // Refresh the grooves list in the modal
         function refreshGroovesList() {
             var groovesList = document.getElementById('groovesList');
@@ -1604,6 +1618,7 @@
             noGroovesMsg.style.display = 'none';
             groovesList.innerHTML = '';
 
+            // Show the newest saved grooves first.
             for (var i = allGrooves.length - 1; i >= 0; i--) {
                 var groove = allGrooves[i];
                 var item = document.createElement('div');
