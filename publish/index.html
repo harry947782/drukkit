@@ -26,16 +26,16 @@
                 class="hamburger-btn"
                 id="headerMenuBtn"
                 type="button"
-                aria-label="Header controls"
                 aria-controls="headerMenuPanel"
                 aria-expanded="false"
             >
-                <span></span>
-                <span></span>
-                <span></span>
+                <span class="sr-only" id="headerMenuLabel">Header controls</span>
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
             </button>
 
-            <div class="header-menu-panel" id="headerMenuPanel" hidden>
+            <div class="header-menu-panel" id="headerMenuPanel" role="region" aria-labelledby="headerMenuLabel" hidden>
                 <div class="controls">
                     <div class="control-group">
                         <label for="timeSigSelect">Time:</label>
