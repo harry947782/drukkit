@@ -1580,7 +1580,13 @@
         }
 
         function formatGrooveMeta(groove) {
-            return `${groove.state.time} / ${groove.state.bars} bars / ${groove.state.sub} • ${formatGrooveDate(groove.timestamp)}`;
+            return groove.state.time + " / " + groove.state.bars + " bars / " + groove.state.sub + " • " + formatGrooveDate(groove.timestamp);
+        }
+
+        function createGrooveActionHandler(grooveId, callback) {
+            return function() {
+                callback(grooveId);
+            };
         }
 
         // Refresh the grooves list in the modal
@@ -1624,27 +1630,23 @@
                 var loadBtn = document.createElement('button');
                 loadBtn.className = 'groove-load-btn';
                 loadBtn.textContent = 'Load';
-                loadBtn.onclick = (function(id) {
-                    return function() {
-                        if (loadGrooveFromStorage(id)) {
-                            var loadModal = document.getElementById('loadModal');
-                            loadModal.style.display = 'none';
-                        }
-                    };
-                })(groove.id);
+                loadBtn.onclick = createGrooveActionHandler(groove.id, function(id) {
+                    if (loadGrooveFromStorage(id)) {
+                        var loadModal = document.getElementById('loadModal');
+                        loadModal.style.display = 'none';
+                    }
+                });
                 actions.appendChild(loadBtn);
 
                 var deleteBtn = document.createElement('button');
                 deleteBtn.className = 'groove-delete-btn';
                 deleteBtn.textContent = 'Delete';
-                deleteBtn.onclick = (function(id) {
-                    return function() {
-                        if (confirm('Are you sure you want to delete this groove?')) {
-                            deleteGrooveFromStorage(id);
-                            refreshGroovesList();
-                        }
-                    };
-                })(groove.id);
+                deleteBtn.onclick = createGrooveActionHandler(groove.id, function(id) {
+                    if (confirm('Are you sure you want to delete this groove?')) {
+                        deleteGrooveFromStorage(id);
+                        refreshGroovesList();
+                    }
+                });
                 actions.appendChild(deleteBtn);
 
                 item.appendChild(actions);
@@ -1751,7 +1753,7 @@
 
         // Allow Enter key to submit save dialog
         document.getElementById('grooveName').onkeypress = function(e) {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' || e.keyCode === 13) {
                 document.getElementById('saveConfirmBtn').click();
             }
         };
