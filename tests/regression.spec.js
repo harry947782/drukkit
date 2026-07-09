@@ -361,6 +361,7 @@ test('saves and reloads grooves with stacked variants', async ({ page }) => {
   await expect(page.locator('#compositionNotes')).toHaveValue('Save both variants');
   await expect(page.locator('#variantsSelect')).toHaveValue('2');
   await expect(page.locator('.track-row[data-variant="0"][data-instrument="snare"] .instrument-label-input')).toHaveValue('backbeat');
+  await expect(page.locator('.track-row[data-variant="1"][data-instrument="snare"] .instrument-label-input')).toHaveValue('backbeat');
   expect(await stepClasses(page, 'hihat', 0, 0)).toEqual({ active: true, right: false, left: false, accent: false });
   expect(await stepClasses(page, 'hihat', 0, 1)).toEqual({ active: false, right: false, left: false, accent: false });
   expect(await stepClasses(page, 'snare', 4, 1)).toEqual({ active: false, right: true, left: false, accent: false });

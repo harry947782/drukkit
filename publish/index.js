@@ -1561,7 +1561,13 @@
                 if (diffHours < 24) return diffHours + " hour" + (diffHours > 1 ? "s" : "") + " ago";
                 if (diffDays < 7) return diffDays + " day" + (diffDays > 1 ? "s" : "") + " ago";
                 
-                return date.toLocaleDateString() + " " + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                return date.toLocaleString([], {
+                    year: 'numeric',
+                    month: 'numeric',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
             } catch (e) {
                 return "unknown";
             }
