@@ -36,6 +36,8 @@
         var projectTitle = document.getElementById('projectTitle');
         var compositionNotes = document.getElementById('compositionNotes');
         var printQrCode = document.getElementById('printQrCode');
+        var headerMenuBtn = document.getElementById('headerMenuBtn');
+        var headerMenuPanel = document.getElementById('headerMenuPanel');
 
         var globalCachedGridTemplate = "";
         var globalCachedTotalSteps = 0;
@@ -46,6 +48,17 @@
             var val = parseInt(barsSelect.value, 10);
             if (isNaN(val) || val < 1) return 1;
             return val;
+        }
+
+        function updateNotesContainerClass() {
+            var notesContainer = document.querySelector('.notes-container');
+            if (notesContainer) {
+                if (compositionNotes.value.trim().length === 0) {
+                    notesContainer.classList.add('empty');
+                } else {
+                    notesContainer.classList.remove('empty');
+                }
+            }
         }
 
         function updateSubdivisionDropdown() {
@@ -60,6 +73,15 @@
                 subdivisionSelect.appendChild(opt);
             }
             subdivisionSelect.value = '16th';
+        }
+
+        function setHeaderMenuOpen(isOpen) {
+            headerMenuBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            headerMenuPanel.hidden = !isOpen;
+        }
+
+        function toggleHeaderMenu() {
+            setHeaderMenuOpen(headerMenuPanel.hidden);
         }
 
         // Compression/decompression functions for QR code URL optimization
@@ -1125,6 +1147,7 @@
             }
             
             // Core Fix: Forces QR rendering on original link hydration or bootup cycle
+            updateNotesContainerClass();
             updateURL();
         }
 
@@ -1341,6 +1364,7 @@
         };
 
         compositionNotes.oninput = function() {
+            updateNotesContainerClass();
             updateURL();
         };
 
@@ -1399,6 +1423,7 @@
             document.body.classList.toggle('light-mode');
         };
 
+<<<<<<< HEAD
         // --- Save/Load Groove Event Listeners ---
 
         // Save button
@@ -1462,6 +1487,24 @@
                 this.style.display = 'none';
             }
         };
+=======
+        headerMenuBtn.onclick = function() {
+            toggleHeaderMenu();
+        };
+
+        document.addEventListener('click', function(event) {
+            if (!headerMenuPanel.hidden && !event.target.closest('.header-menu')) {
+                setHeaderMenuOpen(false);
+            }
+        });
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && !headerMenuPanel.hidden) {
+                setHeaderMenuOpen(false);
+                headerMenuBtn.focus();
+            }
+        });
+>>>>>>> origin/main
 
         // Initialize App Runtime
         initFromURLOrDefaults();
