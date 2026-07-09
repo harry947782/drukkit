@@ -311,6 +311,137 @@ test('reorders tracks and persists the new order in the share payload', async ({
   }).toEqual(['hihat', 'bass', 'snare']);
 });
 
+test('saves and reloads grooves with stacked variants', async ({ page }) => {
+  await gotoApp(page);
+  await page.evaluate(() => {
+    try { localStorage.clear(); } catch (e) {}
+  });
+  await clearGrid(page);
+  await openHeaderMenu(page);
+  await page.locator('#variantsSelect').fill('2');
+
+  const titleInput = page.locator('#projectTitle');
+  await titleInput.fill('Test Groove');
+  await page.locator('#compositionNotes').fill('Save both variants');
+  await page.locator('.track-row[data-variant="1"][data-instrument="snare"] .instrument-label-input').fill('backbeat');
+  await expect(page.locator('.track-row[data-variant="0"][data-instrument="snare"] .instrument-label-input')).toHaveValue('backbeat');
+  await expect(page.locator('.track-row[data-variant="1"][data-instrument="snare"] .instrument-label-input')).toHaveValue('backbeat');
+
+  await clickStep(page, 'hihat', 0, { variantIndex: 0 });
+  await clickStep(page, 'snare', 4, { variantIndex: 1 });
+  await clickStep(page, 'snare', 4, { variantIndex: 1 });
+
+  await openHeaderMenu(page);
+  await page.getByRole('button', { name: 'Save Groove' }).click();
+  await expect(page.locator('#grooveName')).toBeVisible();
+  await page.locator('#grooveName').fill('My Test Groove');
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('#saveConfirmBtn').click();
+  await expect(page.locator('#saveDialog')).toBeHidden();
+
+  const savedGrooves = await page.evaluate(() => JSON.parse(localStorage.getItem('drukkit_grooves')));
+  expect(savedGrooves).toHaveLength(1);
+  expect(savedGrooves[0].state.variants).toHaveLength(2);
+  expect(savedGrooves[0].state.variants[0].tracks.find((track) => track.id === 'hihat').notes).toEqual([
+    { i: 0, s: 'A' }
+  ]);
+  expect(savedGrooves[0].state.variants[1].tracks.find((track) => track.id === 'snare').notes).toEqual([
+    { i: 4, s: 'R' }
+  ]);
+
+  await clearGrid(page);
+  await titleInput.fill('Modified');
+  await openHeaderMenu(page);
+  await page.locator('#variantsSelect').fill('1');
+  await page.getByRole('button', { name: 'Load Groove' }).click();
+  await expect(page.locator('#loadModal')).toBeVisible();
+  await expect(page.locator('.groove-item')).toHaveCount(1);
+  await page.locator('.groove-load-btn').first().click();
+  await expect(page.locator('#loadModal')).toBeHidden();
+
+  await expect(titleInput).toHaveValue('Test Groove');
+  await expect(page.locator('#compositionNotes')).toHaveValue('Save both variants');
+  await expect(page.locator('#variantsSelect')).toHaveValue('2');
+  await expect(page.locator('.track-row[data-variant="0"][data-instrument="snare"] .instrument-label-input')).toHaveValue('backbeat');
+  await expect(page.locator('.track-row[data-variant="1"][data-instrument="snare"] .instrument-label-input')).toHaveValue('backbeat');
+  expect(await stepClasses(page, 'hihat', 0, 0)).toEqual({ active: true, right: false, left: false, accent: false });
+  expect(await stepClasses(page, 'hihat', 0, 1)).toEqual({ active: false, right: false, left: false, accent: false });
+  expect(await stepClasses(page, 'snare', 4, 1)).toEqual({ active: false, right: true, left: false, accent: false });
+});
+
+test('delete saved groove from localStorage', async ({ page }) => {
+  await gotoApp(page);
+  await page.evaluate(() => {
+    try { localStorage.clear(); } catch (e) {}
+  });
+
+  await page.locator('#projectTitle').fill('Groove to Delete');
+  await openHeaderMenu(page);
+  await page.getByRole('button', { name: 'Save Groove' }).click();
+  await page.locator('#grooveName').fill('Delete Me');
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('#saveConfirmBtn').click();
+  await expect(page.locator('#saveDialog')).toBeHidden();
+
+  await openHeaderMenu(page);
+  await page.getByRole('button', { name: 'Load Groove' }).click();
+  const loadModal = page.locator('#loadModal');
+  await expect(loadModal).toBeVisible();
+  await expect(page.locator('.groove-item')).toHaveCount(1);
+
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('.groove-delete-btn').first().click();
+
+  await expect(page.locator('.groove-item')).toHaveCount(0);
+  await expect(page.locator('#noGroovesMsg')).toBeVisible();
+  await page.locator('#modalClose').click();
+  await expect(loadModal).toBeHidden();
+});
+
+test('multiple saves and loads work correctly', async ({ page }) => {
+  await gotoApp(page);
+  await page.evaluate(() => {
+    try { localStorage.clear(); } catch (e) {}
+  });
+
+  const titleInput = page.locator('#projectTitle');
+  await titleInput.fill('Groove 1');
+  await clickStep(page, 'hihat', 0);
+
+  await openHeaderMenu(page);
+  await page.getByRole('button', { name: 'Save Groove' }).click();
+  await page.locator('#grooveName').fill('First Groove');
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('#saveConfirmBtn').click();
+  await expect(page.locator('#saveDialog')).toBeHidden();
+
+  await clearGrid(page);
+  await titleInput.fill('Groove 2');
+  await clickStep(page, 'snare', 4);
+
+  await openHeaderMenu(page);
+  await page.getByRole('button', { name: 'Save Groove' }).click();
+  await page.locator('#grooveName').fill('Second Groove');
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('#saveConfirmBtn').click();
+  await expect(page.locator('#saveDialog')).toBeHidden();
+
+  await openHeaderMenu(page);
+  await page.getByRole('button', { name: 'Load Groove' }).click();
+  const loadModal = page.locator('#loadModal');
+  await expect(loadModal).toBeVisible();
+  await expect(page.locator('.groove-item')).toHaveCount(2);
+
+  const grooveNames = await page.locator('.groove-item-name').evaluateAll((items) => items.map((item) => item.textContent));
+  expect(grooveNames).toEqual(['Second Groove', 'First Groove']);
+
+  await page.locator('.groove-load-btn').first().click();
+  await expect(loadModal).toBeHidden();
+
+  await expect(titleInput).toHaveValue('Groove 2');
+  expect(await stepClasses(page, 'snare', 4)).toEqual({ active: true, right: false, left: false, accent: false });
+});
+
 test('stacks groove variants with independent notes and shared track metadata', async ({ page }) => {
   await gotoApp(page);
   await clearGrid(page);
