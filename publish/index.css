@@ -98,6 +98,19 @@
         }
 
         /* Configurable Project Title Input */
+        .logo-container {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            color: var(--text-color);
+        }
+
+        .logo-container svg {
+            height: 34px;
+            width: auto;
+            display: block;
+        }
+
         .title-container {
             flex-grow: 1;
             min-width: 180px;
@@ -639,6 +652,10 @@
                 display: flex !important;
                 align-items: center !important;
                 justify-content: space-between !important;
+            }
+
+            .logo-container {
+                color: #000000 !important;
             }
 
             .controls,
