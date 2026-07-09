@@ -65,7 +65,7 @@
             var cloned = [];
             for (var i = 0; i < notesList.length; i++) {
                 if (typeof notesList[i] !== 'object') {
-                    cloned.push(notesList[i]);
+                    cloned.push({i: notesList[i], s: 'A'});
                     continue;
                 }
                 var clonedNote = {
@@ -92,15 +92,18 @@
         function normalizeVariantNotesList(variantNotesList, desiredCount) {
             var normalized = [];
             var sourceList = Array.isArray(variantNotesList) ? variantNotesList : [];
-            var baseCount = sourceList.length || 1;
+            var baseCount = sourceList.length;
 
             for (var i = 0; i < Math.min(sourceList.length, desiredCount); i++) {
                 normalized.push(cloneVariantNotesMap(sourceList[i]));
             }
 
             while (normalized.length < desiredCount) {
-                var fallbackIndex = Math.min(normalized.length, baseCount - 1);
-                var fallback = sourceList[fallbackIndex] || sourceList[sourceList.length - 1] || {};
+                var fallback = {};
+                if (baseCount > 0) {
+                    var fallbackIndex = Math.min(normalized.length, baseCount - 1);
+                    fallback = sourceList[fallbackIndex] || sourceList[baseCount - 1] || {};
+                }
                 normalized.push(cloneVariantNotesMap(fallback));
             }
 
@@ -172,7 +175,7 @@
                 var accentBit = (note.a) ? 1 : 0;
 
                 if (offset > 4095) {
-                    console.warn('Note offset ' + offset + ' exceeds the 4095-step QR compression limit, so very sparse notes may not round-trip exactly in compressed share links.');
+                    console.warn('Note offset ' + offset + ' exceeds the 4095-step QR compression limit and will be truncated to 12 bits in compressed share links, causing data loss on decompression.');
                 }
 
                 if (offset < 32) {
@@ -242,7 +245,7 @@
         // Compression/decompression functions for QR code URL optimization
         function compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload) {
             // Bit layout (16-bit value):
-            //   Bits 10-13: variant count - 1 (4 bits: supports 1-16 variants)
+            //   Bit positions 10-13: variant count - 1 (4-bit field, supports 1-16 variants)
             //   Bit 9:  hasNotes flag
             //   Bit 8:  hasTitle flag
             //   Bits 6-7: time signature (2 bits: 0=4/4, 1=3/4, 2=2/2, 3=6/8)
@@ -883,7 +886,10 @@
             }
 
             if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) {
-                console.warn('Unable to reorder track because the source or target instrument was not found.');
+                var missingParts = [];
+                if (sourceIndex === -1) missingParts.push('source=' + instId);
+                if (targetIndex === -1) missingParts.push('target=' + targetInstId);
+                console.warn('Unable to reorder track because ' + (missingParts.length ? missingParts.join(', ') : 'the source and target are identical') + '.');
                 return;
             }
 
@@ -1227,7 +1233,10 @@
             document.body.classList.remove('print-portrait', 'print-landscape');
             var shouldUsePortrait = false;
             var firstGrid = document.querySelector('.variant-section .grid-steps');
-            var isNarrowEnough = globalCachedTotalSteps <= maxStepsForPortraitPrint || (firstGrid && getSanitizedBarsCount() <= 2 && firstGrid.scrollWidth <= portraitPrintMaxWidth);
+            var hasGridForPrintCheck = !!firstGrid;
+            var hasShortBarCount = getSanitizedBarsCount() <= 2;
+            var hasNarrowScrollWidth = hasGridForPrintCheck && hasShortBarCount && firstGrid.scrollWidth <= portraitPrintMaxWidth;
+            var isNarrowEnough = globalCachedTotalSteps <= maxStepsForPortraitPrint || hasNarrowScrollWidth;
             if (getSanitizedVariantsCount() > 1 && isNarrowEnough) {
                 shouldUsePortrait = true;
             }
