@@ -374,3 +374,76 @@ test('uses print-safe variant sections and portrait mode for narrow stacked layo
   expect(printStyles.breakInside).toContain('avoid');
   expect(printStyles.pageBreakInside).toContain('avoid');
 });
+
+test('undo reverts a step activation with Ctrl+Z', async ({ page }) => {
+  await gotoApp(page);
+  await clearGrid(page);
+
+  await clickStep(page, 'hihat', 2);
+  expect(await stepClasses(page, 'hihat', 2)).toEqual({ active: true, right: false, left: false, accent: false });
+
+  await page.keyboard.press('Control+z');
+  expect(await stepClasses(page, 'hihat', 2)).toEqual({ active: false, right: false, left: false, accent: false });
+});
+
+test('redo reapplies a reverted step activation with Ctrl+Y', async ({ page }) => {
+  await gotoApp(page);
+  await clearGrid(page);
+
+  await clickStep(page, 'snare', 4);
+  expect(await stepClasses(page, 'snare', 4)).toEqual({ active: true, right: false, left: false, accent: false });
+
+  await page.keyboard.press('Control+z');
+  expect(await stepClasses(page, 'snare', 4)).toEqual({ active: false, right: false, left: false, accent: false });
+
+  await page.keyboard.press('Control+y');
+  expect(await stepClasses(page, 'snare', 4)).toEqual({ active: true, right: false, left: false, accent: false });
+});
+
+test('undo steps back through multiple state changes', async ({ page }) => {
+  await gotoApp(page);
+  await clearGrid(page);
+
+  await clickStep(page, 'bass', 0);
+  await clickStep(page, 'bass', 1);
+  await clickStep(page, 'bass', 2);
+
+  expect(await activeSteps(page, 'bass')).toHaveLength(3);
+
+  await page.keyboard.press('Control+z');
+  expect(await activeSteps(page, 'bass')).toHaveLength(2);
+
+  await page.keyboard.press('Control+z');
+  expect(await activeSteps(page, 'bass')).toHaveLength(1);
+
+  await page.keyboard.press('Control+z');
+  expect(await activeSteps(page, 'bass')).toHaveLength(0);
+});
+
+test('redo with Ctrl+Shift+Z reapplies the last undone action', async ({ page }) => {
+  await gotoApp(page);
+  await clearGrid(page);
+
+  await clickStep(page, 'hihat', 3);
+  expect(await stepClasses(page, 'hihat', 3)).toEqual({ active: true, right: false, left: false, accent: false });
+
+  await page.keyboard.press('Control+z');
+  expect(await stepClasses(page, 'hihat', 3)).toEqual({ active: false, right: false, left: false, accent: false });
+
+  await page.keyboard.press('Control+Shift+Z');
+  expect(await stepClasses(page, 'hihat', 3)).toEqual({ active: true, right: false, left: false, accent: false });
+});
+
+test('undo restores accent state after right-click toggle', async ({ page }) => {
+  await gotoApp(page);
+  await clearGrid(page);
+
+  await clickStep(page, 'snare', 5);
+  expect(await stepClasses(page, 'snare', 5)).toEqual({ active: true, right: false, left: false, accent: false });
+
+  await clickStep(page, 'snare', 5, { button: 'right' });
+  expect(await stepClasses(page, 'snare', 5)).toEqual({ active: true, right: false, left: false, accent: true });
+
+  await page.keyboard.press('Control+z');
+  expect(await stepClasses(page, 'snare', 5)).toEqual({ active: true, right: false, left: false, accent: false });
+});
