@@ -133,19 +133,80 @@
             border-bottom-color: var(--step-border);
         }
 
+        .header-menu {
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .hamburger-btn {
+            width: 46px;
+            height: 42px;
+            display: inline-flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 5px;
+            background-color: var(--theme-btn);
+            padding: 0 11px;
+        }
+
+        .hamburger-btn:hover,
+        .hamburger-btn[aria-expanded="true"] {
+            background-color: var(--theme-btn-hover);
+            border-color: var(--accent-color);
+        }
+
+        .hamburger-btn span {
+            display: block;
+            width: 100%;
+            height: 2px;
+            border-radius: 999px;
+            background-color: currentColor;
+        }
+
+        .header-menu-panel {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            width: min(320px, calc(100vw - 40px));
+            background-color: var(--panel-bg);
+            border: 1px solid var(--step-border);
+            border-radius: 8px;
+            padding: 14px;
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.28);
+            z-index: 20;
+        }
+
         .controls {
             display: flex;
-            align-items: center;
+            flex-direction: column;
             gap: 12px;
-            flex-wrap: wrap;
         }
 
         .control-group {
             display: flex;
             align-items: center;
-            gap: 6px;
+            justify-content: space-between;
+            gap: 12px;
             font-size: 14px;
             color: var(--text-color);
+        }
+
+        .control-group label {
+            flex-shrink: 0;
+        }
+
+        .control-group select,
+        .control-group input[type="number"] {
+            width: 170px;
+        }
+
+        .control-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .control-actions button {
+            flex: 1;
         }
 
         select, input[type="number"] {
@@ -658,6 +719,7 @@
                 color: #000000 !important;
             }
 
+            .header-menu,
             .controls,
             .delete-track-btn,
             .drag-handle,

@@ -36,6 +36,8 @@
         var projectTitle = document.getElementById('projectTitle');
         var compositionNotes = document.getElementById('compositionNotes');
         var printQrCode = document.getElementById('printQrCode');
+        var headerMenuBtn = document.getElementById('headerMenuBtn');
+        var headerMenuPanel = document.getElementById('headerMenuPanel');
 
         var globalCachedGridTemplate = "";
         var globalCachedTotalSteps = 0;
@@ -71,6 +73,15 @@
                 subdivisionSelect.appendChild(opt);
             }
             subdivisionSelect.value = '16th';
+        }
+
+        function setHeaderMenuOpen(isOpen) {
+            headerMenuBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            headerMenuPanel.hidden = !isOpen;
+        }
+
+        function toggleHeaderMenu() {
+            setHeaderMenuOpen(headerMenuPanel.hidden);
         }
 
         // Compression/decompression functions for QR code URL optimization
@@ -1205,6 +1216,23 @@
         themeBtn.onclick = function() {
             document.body.classList.toggle('light-mode');
         };
+
+        headerMenuBtn.onclick = function() {
+            toggleHeaderMenu();
+        };
+
+        document.addEventListener('click', function(event) {
+            if (!headerMenuPanel.hidden && !event.target.closest('.header-menu')) {
+                setHeaderMenuOpen(false);
+            }
+        });
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && !headerMenuPanel.hidden) {
+                setHeaderMenuOpen(false);
+                headerMenuBtn.focus();
+            }
+        });
 
         // Initialize App Runtime
         initFromURLOrDefaults();

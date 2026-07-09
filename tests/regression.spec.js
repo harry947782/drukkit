@@ -6,7 +6,15 @@ async function gotoApp(page, search = '') {
   await page.goto(`${appPath}${search}`);
 }
 
+async function openHeaderMenu(page) {
+  const menuBtn = page.getByRole('button', { name: 'Header controls' });
+  if ((await menuBtn.getAttribute('aria-expanded')) !== 'true') {
+    await menuBtn.click();
+  }
+}
+
 async function clearGrid(page) {
+  await openHeaderMenu(page);
   await page.getByRole('button', { name: 'Clear' }).click();
 }
 
@@ -62,6 +70,7 @@ test('loads the default groove and share state', async ({ page }) => {
 
   await expect(page.locator('.track-row.header-row')).toHaveCount(1);
   await expect(page.locator('.track-row:not(.header-row)')).toHaveCount(3);
+  await expect(page.locator('#headerMenuPanel')).toBeHidden();
   await expect(page.locator('#barsSelect')).toHaveValue('2');
   await expect(page.locator('#subdivisionSelect')).toHaveValue('16th');
 
@@ -99,6 +108,22 @@ test('loads the default groove and share state', async ({ page }) => {
     search: expect.stringContaining('tracks='),
     qr: expect.stringContaining(encodeURIComponent('/publish/index.html'))
   });
+});
+
+test('opens and closes the header controls hamburger menu', async ({ page }) => {
+  await gotoApp(page);
+
+  const menuBtn = page.getByRole('button', { name: 'Header controls' });
+  const menuPanel = page.locator('#headerMenuPanel');
+
+  await expect(menuPanel).toBeHidden();
+  await menuBtn.click();
+  await expect(menuPanel).toBeVisible();
+  await expect(menuBtn).toHaveAttribute('aria-expanded', 'true');
+
+  await page.keyboard.press('Escape');
+  await expect(menuPanel).toBeHidden();
+  await expect(menuBtn).toHaveAttribute('aria-expanded', 'false');
 });
 
 test('cycles note states and toggles accents without losing hand annotations', async ({ page }) => {
@@ -224,6 +249,7 @@ test('copies bars with hand states and accents intact', async ({ page }) => {
 test('deletes bars and shifts later notes left', async ({ page }) => {
   await gotoApp(page);
   await clearGrid(page);
+  await openHeaderMenu(page);
   await page.locator('#barsSelect').fill('3');
 
   await clickStep(page, 'hihat', 18);
@@ -257,6 +283,7 @@ test('duplicates the first bar when extending from the start boundary', async ({
 
 test('hides delete controls when the chart has only one bar', async ({ page }) => {
   await gotoApp(page);
+  await openHeaderMenu(page);
   await page.locator('#barsSelect').fill('1');
 
   await expect(page.locator('.bar-copy-menu .del-btn')).toHaveCount(0);
