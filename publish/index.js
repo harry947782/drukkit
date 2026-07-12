@@ -341,6 +341,7 @@
         }
 
         // Compression/decompression functions for QR code URL optimization
+        var MAX_URL_LENGTH = 2000;
         function compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload) {
             // Bit layout (16-bit value):
             //   Bit positions 10-13: variant count - 1 (4-bit field, supports 1-16 variants)
@@ -536,6 +537,7 @@
             var savedVariants = normalizeVariantNotesList(extractAllVariantNotes(), variantCount);
             var savedNotes = savedVariants[0] || {};
             var tracksPayload = buildTracksPayload(savedNotes);
+            var variantsPayload = variantCount > 1 ? buildVariantsPayload(savedVariants) : null;
 
             var params = new URLSearchParams();
             params.set('title', titleVal);
@@ -545,23 +547,28 @@
             params.set('notes', notesVal);
             params.set('tracks', JSON.stringify(tracksPayload));
             if (variantCount > 1) {
-                params.set('variants', JSON.stringify(buildVariantsPayload(savedVariants)));
+                params.set('variants', JSON.stringify(variantsPayload));
             }
 
             var newUrl = buildBaseUrl() + '?' + params.toString();
+
+            // Fall back to the compressed format when the URL exceeds the practical URI limit.
+            // The compressed value is also reused for the QR code below to avoid compressing twice.
+            var compressed = null;
+            if (newUrl.length > MAX_URL_LENGTH) {
+                compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload);
+                var compressedParams = new URLSearchParams();
+                compressedParams.set('c', compressed);
+                newUrl = buildBaseUrl() + '?' + compressedParams.toString();
+            }
+
             window.history.replaceState({ path: newUrl }, '', newUrl);
 
             // Generate compressed URL for QR code
             if (printQrCode) {
-                var compressed = compressState(
-                    tracksPayload,
-                    timeVal,
-                    barsVal,
-                    subVal,
-                    titleVal,
-                    notesVal,
-                    variantCount > 1 ? buildVariantsPayload(savedVariants) : null
-                );
+                if (!compressed) {
+                    compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload);
+                }
                 var qrParams = new URLSearchParams();
                 qrParams.set('c', compressed);
                 var qrUrl = buildBaseUrl() + '?' + qrParams.toString();
