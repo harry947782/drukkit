@@ -976,6 +976,24 @@
             background-color: #d9c3e4;
         }
 
+        .download-btn {
+            background-color: #2a7a55;
+            border-color: #3aab76;
+            color: #ffffff;
+        }
+        .download-btn:hover {
+            background-color: #3aab76;
+        }
+
+        body.light-mode .download-btn {
+            background-color: #c8eedd;
+            border-color: #a8dcc4;
+            color: #1a1a1a;
+        }
+        body.light-mode .download-btn:hover {
+            background-color: #a8dcc4;
+        }
+
         /* Modal Styling */
         .modal {
             position: fixed;

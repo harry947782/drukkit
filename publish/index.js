@@ -1564,6 +1564,34 @@
             }
         }
 
+        function downloadGrooveAsJson() {
+            var titleVal = projectTitle.value;
+            var variantCount = getSanitizedVariantsCount();
+            var savedVariants = normalizeVariantNotesList(extractAllVariantNotes(), variantCount);
+            var tracksPayload = buildTracksPayload(savedVariants[0] || {});
+            var variantsPayload = buildVariantsPayload(savedVariants);
+
+            var grooveData = {
+                title: titleVal,
+                time: timeSigSelect.value,
+                bars: barsSelect.value,
+                sub: subdivisionSelect.value,
+                notes: compositionNotes.value,
+                tracks: tracksPayload,
+                variants: variantCount > 1 ? variantsPayload : null
+            };
+
+            var json = JSON.stringify(grooveData, null, 2);
+            var blob = new Blob([json], { type: 'application/json' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            var safeName = titleVal.trim().replace(/\s+/g, '_').replace(/[^a-z0-9_\-]/gi, '') || 'groove';
+            a.href = url;
+            a.download = safeName + '.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
         // Load a groove from localStorage
         function loadGrooveFromStorage(grooveId) {
             try {
@@ -1876,6 +1904,11 @@
         document.getElementById('loadBtn').onclick = function() {
             refreshGroovesList();
             document.getElementById('loadModal').style.display = 'flex';
+        };
+
+        // Download JSON button
+        document.getElementById('downloadBtn').onclick = function() {
+            downloadGrooveAsJson();
         };
 
         // Modal close button
