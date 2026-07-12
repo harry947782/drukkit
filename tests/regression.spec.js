@@ -603,10 +603,14 @@ test('switches to compressed URL format when state exceeds 2000 characters', asy
   expect(search.startsWith('?c=')).toBe(true);
   expect(search).not.toContain('tracks=');
 
-  // The compressed URL must round-trip: reload it and verify the notes survive
+  // The compressed URL must round-trip: reload it and verify the notes and settings survive
   const compressedUrl = page.url();
   await page.goto(compressedUrl);
 
+  await expect(page.locator('#projectTitle')).toHaveValue('Long State Test');
+  await expect(page.locator('#timeSigSelect')).toHaveValue('4/4');
+  await expect(page.locator('#barsSelect')).toHaveValue('4');
+  await expect(page.locator('#subdivisionSelect')).toHaveValue('16th');
   expect(await activeSteps(page, 'hihat')).toHaveLength(16);
   expect(await activeSteps(page, 'snare')).toHaveLength(16);
   expect(await activeSteps(page, 'bass')).toHaveLength(16);

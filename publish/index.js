@@ -551,9 +551,11 @@
 
             var newUrl = buildBaseUrl() + '?' + params.toString();
 
-            // Fall back to the compressed format when the URL exceeds the practical URI limit
-            var compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload);
+            // Fall back to the compressed format when the URL exceeds the practical URI limit.
+            // The compressed value is also reused for the QR code below to avoid compressing twice.
+            var compressed = null;
             if (newUrl.length > 2000) {
+                compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload);
                 var compressedParams = new URLSearchParams();
                 compressedParams.set('c', compressed);
                 newUrl = buildBaseUrl() + '?' + compressedParams.toString();
@@ -563,6 +565,9 @@
 
             // Generate compressed URL for QR code
             if (printQrCode) {
+                if (!compressed) {
+                    compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload);
+                }
                 var qrParams = new URLSearchParams();
                 qrParams.set('c', compressed);
                 var qrUrl = buildBaseUrl() + '?' + qrParams.toString();
