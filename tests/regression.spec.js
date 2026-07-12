@@ -578,3 +578,36 @@ test('undo restores accent state after right-click toggle', async ({ page }) => 
   await page.keyboard.press('Control+z');
   expect(await stepClasses(page, 'snare', 5)).toEqual({ active: true, right: false, left: false, accent: false });
 });
+
+test('switches to compressed URL format when state exceeds 2000 characters', async ({ page }) => {
+  // Build a large initial state with 16 notes per track (produces URL > 2000 chars)
+  const noteIndices = Array.from({ length: 16 }, (_, i) => i * 4);
+  const largeNotes = noteIndices.map((i) => ({ i, s: 'A' }));
+  const tracks = [
+    { id: 'hihat', name: 'hihat', sym: 'cross', notes: largeNotes },
+    { id: 'snare', name: 'snare', sym: 'cross', notes: largeNotes },
+    { id: 'bass',  name: 'bass',  sym: 'circle', notes: largeNotes }
+  ];
+  const params = new URLSearchParams({
+    title: 'Long State Test',
+    time: '4/4',
+    bars: '4',
+    sub: '16th',
+    notes: '',
+    tracks: JSON.stringify(tracks)
+  });
+  await gotoApp(page, `?${params.toString()}`);
+
+  // After init, updateURL() should have switched to the compressed ?c= format
+  const search = await page.evaluate(() => window.location.search);
+  expect(search.startsWith('?c=')).toBe(true);
+  expect(search).not.toContain('tracks=');
+
+  // The compressed URL must round-trip: reload it and verify the notes survive
+  const compressedUrl = page.url();
+  await page.goto(compressedUrl);
+
+  expect(await activeSteps(page, 'hihat')).toHaveLength(16);
+  expect(await activeSteps(page, 'snare')).toHaveLength(16);
+  expect(await activeSteps(page, 'bass')).toHaveLength(16);
+});

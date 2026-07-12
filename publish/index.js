@@ -536,6 +536,7 @@
             var savedVariants = normalizeVariantNotesList(extractAllVariantNotes(), variantCount);
             var savedNotes = savedVariants[0] || {};
             var tracksPayload = buildTracksPayload(savedNotes);
+            var variantsPayload = variantCount > 1 ? buildVariantsPayload(savedVariants) : null;
 
             var params = new URLSearchParams();
             params.set('title', titleVal);
@@ -545,23 +546,23 @@
             params.set('notes', notesVal);
             params.set('tracks', JSON.stringify(tracksPayload));
             if (variantCount > 1) {
-                params.set('variants', JSON.stringify(buildVariantsPayload(savedVariants)));
+                params.set('variants', JSON.stringify(variantsPayload));
             }
 
             var newUrl = buildBaseUrl() + '?' + params.toString();
+
+            // Fall back to the compressed format when the URL exceeds the practical URI limit
+            var compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload);
+            if (newUrl.length > 2000) {
+                var compressedParams = new URLSearchParams();
+                compressedParams.set('c', compressed);
+                newUrl = buildBaseUrl() + '?' + compressedParams.toString();
+            }
+
             window.history.replaceState({ path: newUrl }, '', newUrl);
 
             // Generate compressed URL for QR code
             if (printQrCode) {
-                var compressed = compressState(
-                    tracksPayload,
-                    timeVal,
-                    barsVal,
-                    subVal,
-                    titleVal,
-                    notesVal,
-                    variantCount > 1 ? buildVariantsPayload(savedVariants) : null
-                );
                 var qrParams = new URLSearchParams();
                 qrParams.set('c', compressed);
                 var qrUrl = buildBaseUrl() + '?' + qrParams.toString();
