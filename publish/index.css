@@ -217,11 +217,18 @@
 
         .control-actions {
             display: flex;
+            flex-wrap: wrap;
             gap: 10px;
         }
 
         .control-actions button {
             flex: 1;
+        }
+
+        .control-actions .save-btn,
+        .control-actions .load-btn,
+        .control-actions .download-btn {
+            flex: 0 0 100%;
         }
 
         select, input[type="number"] {
