@@ -341,6 +341,7 @@
         }
 
         // Compression/decompression functions for QR code URL optimization
+        var MAX_URL_LENGTH = 2000;
         function compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload) {
             // Bit layout (16-bit value):
             //   Bit positions 10-13: variant count - 1 (4-bit field, supports 1-16 variants)
@@ -554,7 +555,7 @@
             // Fall back to the compressed format when the URL exceeds the practical URI limit.
             // The compressed value is also reused for the QR code below to avoid compressing twice.
             var compressed = null;
-            if (newUrl.length > 2000) {
+            if (newUrl.length > MAX_URL_LENGTH) {
                 compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload);
                 var compressedParams = new URLSearchParams();
                 compressedParams.set('c', compressed);

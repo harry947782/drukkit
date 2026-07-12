@@ -580,7 +580,8 @@ test('undo restores accent state after right-click toggle', async ({ page }) => 
 });
 
 test('switches to compressed URL format when state exceeds 2000 characters', async ({ page }) => {
-  // Build a large initial state with 16 notes per track (produces URL > 2000 chars)
+  // Build a large initial state with 16 notes per track (produces URL > 2000 chars).
+  // Notes are spaced 4 steps apart to spread them across 4 bars of 16th-note resolution.
   const noteIndices = Array.from({ length: 16 }, (_, i) => i * 4);
   const largeNotes = noteIndices.map((i) => ({ i, s: 'A' }));
   const tracks = [
@@ -614,4 +615,27 @@ test('switches to compressed URL format when state exceeds 2000 characters', asy
   expect(await activeSteps(page, 'hihat')).toHaveLength(16);
   expect(await activeSteps(page, 'snare')).toHaveLength(16);
   expect(await activeSteps(page, 'bass')).toHaveLength(16);
+});
+
+test('keeps uncompressed URL format when state is under 2000 characters', async ({ page }) => {
+  // A small state (2 bars, just a few notes) stays well under the 2000-char limit
+  const tracks = [
+    { id: 'hihat', name: 'hihat', sym: 'cross',  notes: [{ i: 0, s: 'A' }] },
+    { id: 'snare', name: 'snare', sym: 'cross',  notes: [{ i: 4, s: 'A' }] },
+    { id: 'bass',  name: 'bass',  sym: 'circle', notes: [] }
+  ];
+  const params = new URLSearchParams({
+    title: 'Short State',
+    time: '4/4',
+    bars: '2',
+    sub: '16th',
+    notes: '',
+    tracks: JSON.stringify(tracks)
+  });
+  await gotoApp(page, `?${params.toString()}`);
+
+  // updateURL() must keep the human-readable ?tracks= format for short sessions
+  const search = await page.evaluate(() => window.location.search);
+  expect(search).toContain('tracks=');
+  expect(search.startsWith('?c=')).toBe(false);
 });
