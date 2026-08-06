@@ -547,6 +547,70 @@
         .gap-beat-space { min-width: 0; }
         .gap-bar-line { min-width: 0; position: relative; }
 
+        /* Bar Repetition Count Row (Nx labels above each bar, per variant) */
+        .bar-reps-row {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            width: 100%;
+            margin-bottom: -14px;
+        }
+
+        .reps-label-spacer {
+            visibility: hidden;
+        }
+
+        .reps-grid .gap-bar-line::before {
+            display: none !important;
+        }
+
+        .bar-reps-cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 20px;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            color: var(--accent-color);
+            opacity: 0.35;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: opacity 0.15s, background-color 0.15s;
+            min-width: 0;
+            user-select: none;
+        }
+
+        .bar-reps-cell:hover {
+            opacity: 0.8;
+            background-color: var(--step-bg);
+        }
+
+        .bar-reps-cell.has-reps {
+            opacity: 1;
+        }
+
+        .reps-inline-input {
+            width: 100%;
+            max-width: 48px;
+            height: 18px;
+            border: 1px solid var(--accent-color);
+            border-radius: 3px;
+            background: var(--bg-color);
+            color: var(--accent-color);
+            font-size: 11px;
+            font-weight: bold;
+            text-align: center;
+            padding: 0 2px;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        .reps-inline-input::-webkit-inner-spin-button,
+        .reps-inline-input::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+        }
+
         .gap-bar-line::before {
             content: '';
             position: absolute;
@@ -822,6 +886,20 @@
                 color: #000000 !important;
                 break-after: avoid-page !important;
                 page-break-after: avoid !important;
+            }
+
+            .bar-reps-row {
+                pointer-events: none !important;
+                margin-bottom: -14px !important;
+            }
+
+            .bar-reps-cell {
+                color: #000000 !important;
+                opacity: 1 !important;
+            }
+
+            .bar-reps-cell:not(.has-reps) {
+                visibility: hidden !important;
             }
 
             .track-row.header-row {
