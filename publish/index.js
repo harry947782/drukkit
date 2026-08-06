@@ -640,10 +640,17 @@
             window.history.replaceState({ path: newUrl }, '', newUrl);
 
             // Generate compressed URL for QR code (use full URL when beat sub overrides are active)
+            // Suppress QR when the beat-override URL exceeds safe QR data capacity for 90×90 px print output.
+            var maxQrUrlLength = 300;
             if (printQrCode) {
                 var qrUrl;
                 if (hasBeatSubOverrides) {
-                    qrUrl = newUrl;
+                    if (newUrl.length > maxQrUrlLength) {
+                        printQrCode.src = '';
+                    } else {
+                        qrUrl = newUrl;
+                        printQrCode.src = "https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=" + encodeURIComponent(qrUrl);
+                    }
                 } else {
                     if (!compressed) {
                         compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload);
@@ -651,8 +658,8 @@
                     var qrParams = new URLSearchParams();
                     qrParams.set('c', compressed);
                     qrUrl = buildBaseUrl() + '?' + qrParams.toString();
+                    printQrCode.src = "https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=" + encodeURIComponent(qrUrl);
                 }
-                printQrCode.src = "https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=" + encodeURIComponent(qrUrl);
             }
         }
 
@@ -1045,6 +1052,8 @@
                     btn.title = sub.l;
                     btn.onclick = function(e) {
                         e.stopPropagation();
+                        var effectiveMult = beatSubOverrides[beatIndex] !== undefined ? beatSubOverrides[beatIndex] : globalMult;
+                        if (sub.m === effectiveMult) return;
                         pushUndoSnapshot();
                         applyBeatSubOverrideChange(beatIndex, sub.m);
                     };
