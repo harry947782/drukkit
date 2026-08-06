@@ -42,6 +42,7 @@
 
         var globalCachedGridTemplate = "";
         var globalCachedTotalSteps = 0;
+        var beatSubOverrides = {};
         var dragSrcRow = null;
         var defaultProjectTitle = "My Drum Groove Composition";
         var maxStepsForPortraitPrint = 16;
@@ -70,6 +71,72 @@
             return val;
         }
 
+        function getEffectiveBeatMultiplier(beatIndex, globalMultiplier) {
+            var override = beatSubOverrides[beatIndex];
+            return (override !== undefined) ? override : globalMultiplier;
+        }
+
+        function computeBeatMultipliersArray(beatsPerBar, globalMultiplier) {
+            var arr = [];
+            for (var i = 0; i < beatsPerBar; i++) {
+                arr.push(getEffectiveBeatMultiplier(i, globalMultiplier));
+            }
+            return arr;
+        }
+
+        function computeStepsPerBarFromArray(beatMultipliers) {
+            var total = 0;
+            for (var i = 0; i < beatMultipliers.length; i++) total += beatMultipliers[i];
+            return total;
+        }
+
+        function computeBeatStartOffset(beatMultipliers, beatIndex) {
+            var offset = 0;
+            for (var i = 0; i < beatIndex; i++) offset += beatMultipliers[i];
+            return offset;
+        }
+
+        function remapNotesForBeatMultiplierChange(savedVariants, oldBeatMultipliers, newBeatMultipliers, totalBars) {
+            var beatsPerBar = oldBeatMultipliers.length;
+            var oldStepsPerBar = computeStepsPerBarFromArray(oldBeatMultipliers);
+            var newStepsPerBar = computeStepsPerBarFromArray(newBeatMultipliers);
+            var remapped = [];
+            for (var v = 0; v < savedVariants.length; v++) {
+                var newVariant = {};
+                var variant = savedVariants[v];
+                for (var instId in variant) {
+                    if (!variant.hasOwnProperty(instId)) continue;
+                    var newNotes = [];
+                    var oldNotes = variant[instId];
+                    for (var n = 0; n < oldNotes.length; n++) {
+                        var note = oldNotes[n];
+                        var stepIdx = (typeof note === 'object') ? note.i : note;
+                        var stateType = (typeof note === 'object') ? note.s : 'A';
+                        var bar = Math.floor(stepIdx / oldStepsPerBar);
+                        if (bar >= totalBars) continue;
+                        var posInBar = stepIdx - bar * oldStepsPerBar;
+                        var beat = beatsPerBar - 1;
+                        var beatStartOld = 0;
+                        for (var bt = 0; bt < beatsPerBar; bt++) {
+                            var nextStart = beatStartOld + oldBeatMultipliers[bt];
+                            if (posInBar < nextStart) { beat = bt; break; }
+                            beatStartOld = nextStart;
+                        }
+                        var subOffset = posInBar - beatStartOld;
+                        if (subOffset >= newBeatMultipliers[beat]) continue;
+                        var newBeatStart = computeBeatStartOffset(newBeatMultipliers, beat);
+                        var newIdx = bar * newStepsPerBar + newBeatStart + subOffset;
+                        var newNote = {i: newIdx, s: stateType};
+                        if (typeof note === 'object' && note.a) newNote.a = 1;
+                        newNotes.push(newNote);
+                    }
+                    newVariant[instId] = newNotes;
+                }
+                remapped.push(newVariant);
+            }
+            return remapped;
+        }
+
         function captureSnapshot() {
             return {
                 title: projectTitle.value,
@@ -77,6 +144,7 @@
                 bars: barsSelect.value,
                 variants: variantsSelect.value,
                 sub: subdivisionSelect.value,
+                beatSubOverrides: JSON.parse(JSON.stringify(beatSubOverrides)),
                 notes: compositionNotes.value,
                 instruments: liveInstrumentsMemory.map(function(inst) {
                     return { id: inst.id, defaultName: inst.defaultName, symbol: inst.symbol };
@@ -125,6 +193,8 @@
                 subdivisionSelect.appendChild(opt);
             }
             subdivisionSelect.value = snapshot.sub;
+
+            beatSubOverrides = snapshot.beatSubOverrides ? JSON.parse(JSON.stringify(snapshot.beatSubOverrides)) : {};
 
             buildNotationGrid();
             var variantCount = parseInt(snapshot.variants, 10) || 1;
@@ -549,13 +619,18 @@
             if (variantCount > 1) {
                 params.set('variants', JSON.stringify(variantsPayload));
             }
+            var hasBeatSubOverrides = Object.keys(beatSubOverrides).length > 0;
+            if (hasBeatSubOverrides) {
+                params.set('beatSubs', JSON.stringify(beatSubOverrides));
+            }
 
             var newUrl = buildBaseUrl() + '?' + params.toString();
 
             // Fall back to the compressed format when the URL exceeds the practical URI limit.
+            // Skip compression when beat-level subdivision overrides are active (not encoded in compressed format).
             // The compressed value is also reused for the QR code below to avoid compressing twice.
             var compressed = null;
-            if (newUrl.length > MAX_URL_LENGTH) {
+            if (!hasBeatSubOverrides && newUrl.length > MAX_URL_LENGTH) {
                 compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload);
                 var compressedParams = new URLSearchParams();
                 compressedParams.set('c', compressed);
@@ -564,14 +639,19 @@
 
             window.history.replaceState({ path: newUrl }, '', newUrl);
 
-            // Generate compressed URL for QR code
+            // Generate compressed URL for QR code (use full URL when beat sub overrides are active)
             if (printQrCode) {
-                if (!compressed) {
-                    compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload);
+                var qrUrl;
+                if (hasBeatSubOverrides) {
+                    qrUrl = newUrl;
+                } else {
+                    if (!compressed) {
+                        compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload);
+                    }
+                    var qrParams = new URLSearchParams();
+                    qrParams.set('c', compressed);
+                    qrUrl = buildBaseUrl() + '?' + qrParams.toString();
                 }
-                var qrParams = new URLSearchParams();
-                qrParams.set('c', compressed);
-                var qrUrl = buildBaseUrl() + '?' + qrParams.toString();
                 printQrCode.src = "https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=" + encodeURIComponent(qrUrl);
             }
         }
@@ -659,8 +739,8 @@
             var subVal = subdivisionSelect.value;
             var currentSigConfig = timeSigConfig[sig];
             var currentSub = currentSigConfig.subs.find(function(s) { return s.v === subVal; }) || currentSigConfig.subs[0];
-            
-            var stepsPerBar = currentSigConfig.beats * currentSub.m;
+            var beatMultipliers = computeBeatMultipliersArray(currentSigConfig.beats, currentSub.m);
+            var stepsPerBar = computeStepsPerBarFromArray(beatMultipliers);
             var sourceOffset = fromBarIdx * stepsPerBar;
             var targetOffset = toBarIdx * stepsPerBar;
 
@@ -700,7 +780,8 @@
             var subVal = subdivisionSelect.value;
             var currentSigConfig = timeSigConfig[sig];
             var currentSub = currentSigConfig.subs.find(function(s) { return s.v === subVal; }) || currentSigConfig.subs[0];
-            var stepsPerBar = currentSigConfig.beats * currentSub.m;
+            var beatMultipliers = computeBeatMultipliersArray(currentSigConfig.beats, currentSub.m);
+            var stepsPerBar = computeStepsPerBarFromArray(beatMultipliers);
 
             var startDelIdx = targetBarIdx * stepsPerBar;
             var endDelIdx = startDelIdx + stepsPerBar;
@@ -748,7 +829,8 @@
             var subVal = subdivisionSelect.value;
             var currentSigConfig = timeSigConfig[sig];
             var currentSub = currentSigConfig.subs.find(function(s) { return s.v === subVal; }) || currentSigConfig.subs[0];
-            var stepsPerBar = currentSigConfig.beats * currentSub.m;
+            var beatMultipliers = computeBeatMultipliersArray(currentSigConfig.beats, currentSub.m);
+            var stepsPerBar = computeStepsPerBarFromArray(beatMultipliers);
 
             var savedVariants = extractAllVariantNotes();
             var newVariants = [];
@@ -898,7 +980,96 @@
             containerElement.appendChild(menu);
         }
 
-        function buildGridHeaderElement(totalBars, beatsPerBar, multiplier, gridStyleString, sig) {
+        function getSubLabels(beatMult, sig) {
+            if (sig !== '6/8') {
+                if (beatMult === 2) return ['', '&'];
+                if (beatMult === 3) return ['', 'la', 'li'];
+                if (beatMult === 4) return ['', 'e', '&', 'a'];
+            } else {
+                if (beatMult === 2) return ['', '&'];
+            }
+            return [''];
+        }
+
+        function applyBeatSubOverrideChange(beatIndex, newOverrideMult) {
+            var sig = timeSigSelect.value;
+            var currentSigConfig = timeSigConfig[sig];
+            var currentSub = currentSigConfig.subs.find(function(s) { return s.v === subdivisionSelect.value; }) || currentSigConfig.subs[0];
+            var globalMult = currentSub.m;
+            var beatsPerBar = currentSigConfig.beats;
+
+            var savedVariants = extractAllVariantNotes();
+            var oldBeatMultipliers = computeBeatMultipliersArray(beatsPerBar, globalMult);
+
+            if (newOverrideMult === null || newOverrideMult === globalMult) {
+                delete beatSubOverrides[beatIndex];
+            } else {
+                beatSubOverrides[beatIndex] = newOverrideMult;
+            }
+
+            var newBeatMultipliers = computeBeatMultipliersArray(beatsPerBar, globalMult);
+            var remappedVariants = remapNotesForBeatMultiplierChange(
+                savedVariants, oldBeatMultipliers, newBeatMultipliers, getSanitizedBarsCount()
+            );
+
+            buildNotationGrid();
+            restoreAllVariantNotes(normalizeVariantNotesList(remappedVariants, getSanitizedVariantsCount()));
+            updateURL();
+        }
+
+        function generateBeatSubMenu(containerElement, beatIndex, sig) {
+            var menu = document.createElement('div');
+            menu.classList.add('beat-sub-menu');
+
+            var subVal = subdivisionSelect.value;
+            var currentSigConfig = timeSigConfig[sig];
+            var globalSub = currentSigConfig.subs.find(function(s) { return s.v === subVal; }) || currentSigConfig.subs[0];
+            var globalMult = globalSub.m;
+            var currentOverride = beatSubOverrides[beatIndex];
+            var currentMult = (currentOverride !== undefined) ? currentOverride : globalMult;
+
+            var title = document.createElement('div');
+            title.classList.add('beat-sub-menu-title');
+            title.textContent = 'Beat ' + (beatIndex + 1) + ' subdivisions';
+            menu.appendChild(title);
+
+            var btnRow = document.createElement('div');
+            btnRow.classList.add('beat-sub-menu-btns');
+
+            var availableSubs = currentSigConfig.subs;
+            for (var i = 0; i < availableSubs.length; i++) {
+                (function(sub) {
+                    var btn = document.createElement('button');
+                    btn.className = 'beat-sub-btn' + (sub.m === currentMult ? ' active' : '');
+                    btn.textContent = sub.l.replace(' Notes', '').replace(' (Triplets)', '');
+                    btn.title = sub.l;
+                    btn.onclick = function(e) {
+                        e.stopPropagation();
+                        pushUndoSnapshot();
+                        applyBeatSubOverrideChange(beatIndex, sub.m);
+                    };
+                    btnRow.appendChild(btn);
+                })(availableSubs[i]);
+            }
+
+            if (currentOverride !== undefined) {
+                var resetBtn = document.createElement('button');
+                resetBtn.className = 'beat-sub-btn beat-sub-reset-btn';
+                resetBtn.textContent = 'Reset';
+                resetBtn.title = 'Reset to global subdivision';
+                resetBtn.onclick = function(e) {
+                    e.stopPropagation();
+                    pushUndoSnapshot();
+                    applyBeatSubOverrideChange(beatIndex, null);
+                };
+                btnRow.appendChild(resetBtn);
+            }
+
+            menu.appendChild(btnRow);
+            containerElement.appendChild(menu);
+        }
+
+        function buildGridHeaderElement(totalBars, beatsPerBar, beatMultipliers, gridStyleString, sig) {
             var headerRow = document.createElement('div');
             headerRow.classList.add('track-row', 'header-row');
 
@@ -910,15 +1081,6 @@
             var stepsContainer = document.createElement('div');
             stepsContainer.classList.add('grid-steps');
             stepsContainer.style.gridTemplateColumns = gridStyleString;
-
-            var subLabels = [''];
-            if (sig !== '6/8') {
-                if (multiplier === 2) subLabels = ['', '&'];
-                if (multiplier === 3) subLabels = ['', 'la', 'li'];
-                if (multiplier === 4) subLabels = ['', 'e', '&', 'a'];
-            } else {
-                if (multiplier === 2) subLabels = ['', '&'];
-            }
 
             var startBoundaryGap = document.createElement('div');
             startBoundaryGap.classList.add('gap-bar-line');
@@ -938,14 +1100,25 @@
                         beatGap.classList.add('gap-beat-space');
                         stepsContainer.appendChild(beatGap);
                     }
-                    for (var s = 0; s < multiplier; s++) {
+                    var beatMult = beatMultipliers[bt];
+                    var subLabels = getSubLabels(beatMult, sig);
+                    for (var s = 0; s < beatMult; s++) {
                         var countCell = document.createElement('div');
                         countCell.classList.add('header-count-cell');
                         
                         if (s === 0) {
-                            countCell.textContent = (bt + 1); 
+                            var hasOverride = beatSubOverrides[bt] !== undefined;
+                            countCell.classList.add('beat-number-cell');
+                            if (hasOverride) countCell.classList.add('beat-override-active');
+                            countCell.setAttribute('data-beat-index', bt);
+                            (function(beatIndex) {
+                                generateBeatSubMenu(countCell, beatIndex, sig);
+                            })(bt);
+                            var beatLabel = document.createElement('span');
+                            beatLabel.textContent = (bt + 1);
+                            countCell.appendChild(beatLabel);
                         } else {
-                            countCell.textContent = subLabels[s] || ''; 
+                            countCell.textContent = subLabels[s] || '';
                             countCell.style.opacity = '0.4';
                             countCell.style.fontSize = '11px';
                         }
@@ -1002,7 +1175,7 @@
             liveInstrumentsMemory.splice(targetIndex, 0, moved);
         }
 
-        function appendSingleRowElement(inst, totalBars, beatsPerBar, multiplier, gridStyleString, variantIndex, variantSection) {
+        function appendSingleRowElement(inst, totalBars, beatsPerBar, beatMultipliers, gridStyleString, variantIndex, variantSection) {
             var row = document.createElement('div');
             row.classList.add('track-row', 'sym-' + inst.symbol);
             row.setAttribute('data-instrument', inst.id);
@@ -1162,7 +1335,7 @@
                         beatGap.classList.add('gap-beat-space');
                         stepsContainer.appendChild(beatGap);
                     }
-                    for (var s = 0; s < multiplier; s++) {
+                    for (var s = 0; s < beatMultipliers[bt]; s++) {
                         var step = document.createElement('div');
                         step.classList.add('step');
                         step.setAttribute('data-step', globalStepIndex);
@@ -1234,7 +1407,8 @@
             if (!currentSub) currentSub = currentSigConfig.subs[0];
 
             var multiplier = currentSub.m;
-            var stepsPerBar = beatsPerBar * multiplier;
+            var beatMultipliers = computeBeatMultipliersArray(beatsPerBar, multiplier);
+            var stepsPerBar = computeStepsPerBarFromArray(beatMultipliers);
             globalCachedTotalSteps = stepsPerBar * totalBars; 
 
             var trackColumnsTemplate = [];
@@ -1244,7 +1418,7 @@
                 if (b > 0) trackColumnsTemplate.push('36px');
                 for (var bt = 0; bt < beatsPerBar; bt++) {
                     if (bt > 0) trackColumnsTemplate.push('20px');
-                    for (var s = 0; s < multiplier; s++) {
+                    for (var s = 0; s < beatMultipliers[bt]; s++) {
                         trackColumnsTemplate.push('minmax(0, 1fr)');
                     }
                 }
@@ -1253,7 +1427,7 @@
             trackColumnsTemplate.push('36px'); 
             globalCachedGridTemplate = trackColumnsTemplate.join(' ');
 
-            buildGridHeaderElement(totalBars, beatsPerBar, multiplier, globalCachedGridTemplate, sig);
+            buildGridHeaderElement(totalBars, beatsPerBar, beatMultipliers, globalCachedGridTemplate, sig);
 
             for (var variantIndex = 0; variantIndex < totalVariants; variantIndex++) {
                 var variantSection = createVariantSection(variantIndex);
@@ -1262,7 +1436,7 @@
                         liveInstrumentsMemory[idx],
                         totalBars,
                         beatsPerBar,
-                        multiplier,
+                        beatMultipliers,
                         globalCachedGridTemplate,
                         variantIndex,
                         variantSection
@@ -1271,7 +1445,7 @@
             }
 
             updatePrintLayoutPreference();
-            return { sig: sig, multiplier: multiplier, stepsPerBar: stepsPerBar, totalBars: totalBars };
+            return { sig: sig, multiplier: multiplier, beatMultipliers: beatMultipliers, stepsPerBar: stepsPerBar, totalBars: totalBars };
         }
 
         function applyContextualRhythm(layoutInfo) {
@@ -1283,7 +1457,7 @@
                 var bassRow  = document.querySelector('.track-row[data-variant="' + variantIndex + '"][data-instrument="bass"]');
                 if (!hihatRow || !snareRow || !bassRow) continue;
 
-                var mult = layoutInfo.multiplier;
+                var beatMultipliers = layoutInfo.beatMultipliers;
                 var barSteps = layoutInfo.stepsPerBar;
 
                 for (var bar = 0; bar < layoutInfo.totalBars; bar++) {
@@ -1291,7 +1465,7 @@
 
                     if (layoutInfo.sig === '4/4') {
                         for (var b = 0; b < 4; b++) {
-                            var stepIdx = barOffset + (b * mult);
+                            var stepIdx = barOffset + computeBeatStartOffset(beatMultipliers, b);
                             hihatRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
                             if (b === 0 || b === 2) {
                                 bassRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
@@ -1302,7 +1476,7 @@
                         }
                     } else if (layoutInfo.sig === '3/4') {
                         for (var b = 0; b < 3; b++) {
-                            var stepIdx = barOffset + (b * mult);
+                            var stepIdx = barOffset + computeBeatStartOffset(beatMultipliers, b);
                             hihatRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
                             if (b === 0) {
                                 bassRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
@@ -1312,7 +1486,7 @@
                         }
                     } else if (layoutInfo.sig === '2/4') {
                         for (var b = 0; b < 2; b++) {
-                            var stepIdx = barOffset + (b * mult);
+                            var stepIdx = barOffset + computeBeatStartOffset(beatMultipliers, b);
                             hihatRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
                             if (b === 0) {
                                 bassRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
@@ -1322,7 +1496,7 @@
                         }
                     } else if (layoutInfo.sig === '6/8') {
                         for (var b = 0; b < 6; b++) {
-                            var stepIdx = barOffset + (b * mult);
+                            var stepIdx = barOffset + computeBeatStartOffset(beatMultipliers, b);
                             hihatRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
                             if (b === 0) {
                                 bassRow.querySelector('[data-step="' + stepIdx + '"]').classList.add('active');
@@ -1359,17 +1533,10 @@
                 );
             }
 
-            buildNotationGrid();
+            var layoutInfo = buildNotationGrid();
 
             if (loadDefaultRhythm) {
-                var currentSigConfig = timeSigConfig[timeSigSelect.value];
-                var currentSub = currentSigConfig.subs.find(function(s) { return s.v === subdivisionSelect.value; }) || currentSigConfig.subs[0];
-                applyContextualRhythm({
-                    sig: timeSigSelect.value,
-                    multiplier: currentSub.m,
-                    stepsPerBar: currentSigConfig.beats * currentSub.m,
-                    totalBars: getSanitizedBarsCount()
-                });
+                applyContextualRhythm(layoutInfo);
             } else if (savedVariants) {
                 restoreAllVariantNotes(savedVariants);
             }
@@ -1379,6 +1546,7 @@
         function initFromURLOrDefaults() {
             var params = new URLSearchParams(window.location.search);
             var defaultVariantCount = 1;
+            beatSubOverrides = {};
             
             // Check for compressed format first
             if (params.has('c')) {
@@ -1462,6 +1630,20 @@
                     subdivisionSelect.appendChild(opt);
                 }
                 subdivisionSelect.value = subVal;
+
+                if (params.has('beatSubs')) {
+                    try {
+                        var parsedBeatSubs = JSON.parse(params.get('beatSubs'));
+                        beatSubOverrides = {};
+                        for (var key in parsedBeatSubs) {
+                            if (parsedBeatSubs.hasOwnProperty(key)) {
+                                beatSubOverrides[parseInt(key, 10)] = parsedBeatSubs[key];
+                            }
+                        }
+                    } catch (e) {
+                        beatSubOverrides = {};
+                    }
+                }
 
                 try {
                     var parsedTracks = JSON.parse(params.get('tracks'));
@@ -1810,6 +1992,7 @@
 
         timeSigSelect.onchange = function() {
             pushUndoSnapshot();
+            beatSubOverrides = {};
             updateSubdivisionDropdown();
             handleConfigurationLifecycle(true);
             updateURL();
@@ -1830,6 +2013,7 @@
 
         subdivisionSelect.onchange = function() {
             pushUndoSnapshot();
+            beatSubOverrides = {};
             handleConfigurationLifecycle(true);
             updateURL();
         };
