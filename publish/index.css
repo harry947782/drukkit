@@ -590,6 +590,27 @@
             opacity: 1;
         }
 
+        .reps-inline-input {
+            width: 100%;
+            max-width: 48px;
+            height: 18px;
+            border: 1px solid var(--accent-color);
+            border-radius: 3px;
+            background: var(--bg-color);
+            color: var(--accent-color);
+            font-size: 11px;
+            font-weight: bold;
+            text-align: center;
+            padding: 0 2px;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        .reps-inline-input::-webkit-inner-spin-button,
+        .reps-inline-input::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+        }
+
         .gap-bar-line::before {
             content: '';
             position: absolute;

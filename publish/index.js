@@ -1071,24 +1071,67 @@
                     cell.classList.add('has-reps');
                 }
 
-                (function(barIdx) {
-                    cell.onclick = function(e) {
+                (function(barIdx, cellEl) {
+                    function activateRepsInput(cellEl, currentVal) {
+                        if (cellEl.querySelector('input')) return;
+                        cellEl.textContent = '';
+                        var inp = document.createElement('input');
+                        inp.type = 'number';
+                        inp.min = '2';
+                        inp.max = '99';
+                        inp.value = currentVal;
+                        inp.className = 'reps-inline-input';
+                        cellEl.appendChild(inp);
+                        inp.focus();
+                        inp.select();
+                        function commitInput() {
+                            var v = parseInt(inp.value, 10);
+                            if (!liveVariantReps[variantIndex]) liveVariantReps[variantIndex] = [];
+                            if (isNaN(v) || v < 2) {
+                                liveVariantReps[variantIndex][barIdx] = 0;
+                                cellEl.textContent = '';
+                                cellEl.classList.remove('has-reps');
+                            } else {
+                                liveVariantReps[variantIndex][barIdx] = v;
+                                cellEl.textContent = v + 'x';
+                                cellEl.classList.add('has-reps');
+                            }
+                            updateURL();
+                        }
+                        inp.onblur = commitInput;
+                        inp.onkeydown = function(ev) {
+                            if (ev.key === 'Enter') { inp.blur(); }
+                            else if (ev.key === 'Escape') {
+                                inp.onblur = null;
+                                var prev = liveVariantReps[variantIndex] ? (liveVariantReps[variantIndex][barIdx] || 0) : 0;
+                                if (prev >= 2) {
+                                    cellEl.textContent = prev + 'x';
+                                    cellEl.classList.add('has-reps');
+                                } else {
+                                    cellEl.textContent = '';
+                                    cellEl.classList.remove('has-reps');
+                                }
+                            }
+                            ev.stopPropagation();
+                        };
+                        inp.onclick = function(ev) { ev.stopPropagation(); };
+                    }
+
+                    cellEl.onclick = function(e) {
                         e.stopPropagation();
-                        pushUndoSnapshot();
                         if (!liveVariantReps[variantIndex]) liveVariantReps[variantIndex] = [];
                         var current = liveVariantReps[variantIndex][barIdx] || 0;
-                        var next = (current < 2) ? 2 : (current >= 8 ? 0 : current + 1);
-                        liveVariantReps[variantIndex][barIdx] = next;
-                        if (next >= 2) {
-                            this.textContent = next + 'x';
-                            this.classList.add('has-reps');
+                        if (current < 2) {
+                            pushUndoSnapshot();
+                            liveVariantReps[variantIndex][barIdx] = 2;
+                            cellEl.textContent = '2x';
+                            cellEl.classList.add('has-reps');
+                            updateURL();
                         } else {
-                            this.textContent = '';
-                            this.classList.remove('has-reps');
+                            activateRepsInput(cellEl, current);
                         }
-                        updateURL();
                     };
-                })(b);
+                })(b, cell);
 
                 grid.appendChild(cell);
             }
