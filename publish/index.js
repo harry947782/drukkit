@@ -57,6 +57,15 @@
         var isApplyingSnapshot = false;
 
         var liveVariantReps = [];
+        var liveVariantNames = [];
+
+        var textEncoder = new TextEncoder();
+        var textDecoder = new TextDecoder();
+
+        function getVariantName(variantIndex) {
+            var custom = liveVariantNames[variantIndex];
+            return (custom && custom.trim()) ? custom.trim() : ('Variant ' + (variantIndex + 1));
+        }
 
         function sanitizeRepsData(raw) {
             if (!Array.isArray(raw)) return [];
@@ -97,7 +106,8 @@
                     return { id: inst.id, defaultName: inst.defaultName, symbol: inst.symbol };
                 }),
                 variantNotes: extractAllVariantNotesStatic(),
-                variantReps: liveVariantReps.map(function(arr) { return (arr || []).slice(); })
+                variantReps: liveVariantReps.map(function(arr) { return (arr || []).slice(); }),
+                variantNames: liveVariantNames.slice()
             };
         }
 
@@ -126,6 +136,7 @@
             });
 
             liveVariantReps = sanitizeRepsData(snapshot.variantReps || []);
+            liveVariantNames = (snapshot.variantNames || []).slice();
 
             projectTitle.value = snapshot.title;
             document.title = snapshot.title;
@@ -360,8 +371,9 @@
 
         // Compression/decompression functions for QR code URL optimization
         var MAX_URL_LENGTH = 2000;
-        function compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, repsData) {
+        function compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, repsData, variantNamesArr) {
             // Bit layout (16-bit value):
+            //   Bit 15: hasVariantNames flag
             //   Bit 14: hasReps flag
             //   Bit positions 10-13: variant count - 1 (4-bit field, supports 1-16 variants)
             //   Bit 9:  hasNotes flag
@@ -385,8 +397,17 @@
                 var ra = repsArr[ri] || [];
                 for (var rb = 0; rb < ra.length; rb++) { if (ra[rb] >= 2) { hasRepsBit = 1; break; } }
             }
+
+            var namesArr = variantNamesArr || [];
+            var hasNamesBit = 0;
+            for (var ni = 0; ni < variantCount; ni++) {
+                if (namesArr[ni] && namesArr[ni].trim() && namesArr[ni].trim() !== ('Variant ' + (ni + 1))) {
+                    hasNamesBit = 1;
+                    break;
+                }
+            }
             
-            var metadata = (variantBits << 10) | (timeBits << 6) | (barsBits << 2) | (subBits << 0) | (hasTitle << 8) | (hasNotes << 9) | (hasRepsBit << 14);
+            var metadata = (hasNamesBit << 15) | (hasRepsBit << 14) | (variantBits << 10) | (hasNotes << 9) | (hasTitle << 8) | (timeBits << 6) | (barsBits << 2) | (subBits << 0);
             
             // Build compressed data with proper byte order
             var data = [];
@@ -395,7 +416,7 @@
             
             // Encode title if present (using 2-byte length to support UTF-8 without corruption)
             if (hasTitle) {
-                var titleBytes = new TextEncoder().encode(titleVal);
+                var titleBytes = textEncoder.encode(titleVal);
                 // Cap at 65535 bytes (2-byte length field)
                 var titleLen = Math.min(titleBytes.length, 65535);
                 if (titleLen < titleBytes.length) {
@@ -410,7 +431,7 @@
              
             // Encode notes if present
             if (hasNotes) {
-                var notesBytes = new TextEncoder().encode(notesVal);
+                var notesBytes = textEncoder.encode(notesVal);
                 // Cap at 65535 bytes (2-byte length field)
                 var notesLen = Math.min(notesBytes.length, 65535);
                 if (notesLen < notesBytes.length) {
@@ -456,6 +477,19 @@
                     }
                 }
             }
+
+            // Encode per-variant custom names (1-byte length prefix + UTF-8 bytes per variant)
+            if (hasNamesBit) {
+                for (var nv = 0; nv < variantCount; nv++) {
+                    var nameStr = (namesArr[nv] && namesArr[nv].trim()) ? namesArr[nv].trim() : '';
+                    var nameBytes = textEncoder.encode(nameStr);
+                    var nameLen = Math.min(nameBytes.length, 255);
+                    data.push(nameLen);
+                    for (var nb = 0; nb < nameLen; nb++) {
+                        data.push(nameBytes[nb]);
+                    }
+                }
+            }
             
             // Convert data array to binary string and encode as base64
             var binaryString = '';
@@ -471,7 +505,7 @@
                 var idx = 0;
                 
                 // Decode metadata (2 bytes)
-                // Bit layout: bits 14 (hasReps), bits 13-10 (variant count), bit 9 (hasNotes), bit 8 (hasTitle), bits 6-7 (time), bits 2-5 (bars), bits 0-1 (sub)
+                // Bit layout: bit 15 (hasVariantNames), bit 14 (hasReps), bits 13-10 (variant count), bit 9 (hasNotes), bit 8 (hasTitle), bits 6-7 (time), bits 2-5 (bars), bits 0-1 (sub)
                 var metadata = (allData.charCodeAt(idx++) << 8) | allData.charCodeAt(idx++);
                 var variantCount = ((metadata >> 10) & 0xF) + 1;
                 var timeBits = (metadata >> 6) & 0x3;
@@ -480,6 +514,7 @@
                 var hasTitle = (metadata >> 8) & 0x1;
                 var hasNotes = (metadata >> 9) & 0x1;
                 var hasReps = (metadata >> 14) & 0x1;
+                var hasVariantNames = (metadata >> 15) & 0x1;
                 
                 var timeReverseMap = {0: '4/4', 1: '3/4', 2: '2/2', 3: '6/8'};
                 var subReverseMap = {0: 'quarter', 1: '8th', 2: '12th', 3: '16th'};
@@ -497,7 +532,7 @@
                     for (var i = 0; i < titleLen; i++) {
                         titleBytes.push(allData.charCodeAt(idx++));
                     }
-                    titleVal = new TextDecoder().decode(new Uint8Array(titleBytes));
+                    titleVal = textDecoder.decode(new Uint8Array(titleBytes));
                 }
                 
                 // Decode notes if present
@@ -507,7 +542,7 @@
                     for (var i = 0; i < notesLen; i++) {
                         notesBytes.push(allData.charCodeAt(idx++));
                     }
-                    notesVal = new TextDecoder().decode(new Uint8Array(notesBytes));
+                    notesVal = textDecoder.decode(new Uint8Array(notesBytes));
                 }
                 
                 // Decode track count
@@ -559,6 +594,19 @@
                         decompReps.push(repsBarArr);
                     }
                 }
+
+                // Decode per-variant custom names if present
+                var decompVariantNames = [];
+                if (hasVariantNames) {
+                    for (var nv = 0; nv < variantCount; nv++) {
+                        var nameLen = allData.charCodeAt(idx++);
+                        var nameBytes = [];
+                        for (var nb = 0; nb < nameLen; nb++) {
+                            nameBytes.push(allData.charCodeAt(idx++));
+                        }
+                        decompVariantNames.push(textDecoder.decode(new Uint8Array(nameBytes)));
+                    }
+                }
                 
                 return {
                     time: timeVal,
@@ -568,7 +616,8 @@
                     notes: notesVal,
                     tracks: decompTracks,
                     variants: decompVariants,
-                    reps: decompReps
+                    reps: decompReps,
+                    variantNames: decompVariantNames
                 };
             } catch (e) {
                 console.error("Failed to decompress state", e);
@@ -612,13 +661,22 @@
             }
             if (hasAnyReps) params.set('reps', JSON.stringify(liveVariantReps));
 
+            var hasCustomNames = false;
+            for (var ni = 0; ni < variantCount; ni++) {
+                if (liveVariantNames[ni] && liveVariantNames[ni].trim() && liveVariantNames[ni].trim() !== ('Variant ' + (ni + 1))) {
+                    hasCustomNames = true;
+                    break;
+                }
+            }
+            if (hasCustomNames) params.set('variantnames', JSON.stringify(liveVariantNames.slice(0, variantCount)));
+
             var newUrl = buildBaseUrl() + '?' + params.toString();
 
             // Fall back to the compressed format when the URL exceeds the practical URI limit.
             // The compressed value is also reused for the QR code below to avoid compressing twice.
             var compressed = null;
             if (newUrl.length > MAX_URL_LENGTH) {
-                compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, liveVariantReps);
+                compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, liveVariantReps, liveVariantNames);
                 var compressedParams = new URLSearchParams();
                 compressedParams.set('c', compressed);
                 newUrl = buildBaseUrl() + '?' + compressedParams.toString();
@@ -629,7 +687,7 @@
             // Generate compressed URL for QR code
             if (printQrCode) {
                 if (!compressed) {
-                    compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, liveVariantReps);
+                    compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, liveVariantReps, liveVariantNames);
                 }
                 var qrParams = new URLSearchParams();
                 qrParams.set('c', compressed);
@@ -1151,7 +1209,24 @@
 
             var heading = document.createElement('div');
             heading.classList.add('variant-heading');
-            heading.textContent = 'Variant ' + (variantIndex + 1);
+
+            var nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.classList.add('variant-name-input');
+            nameInput.value = getVariantName(variantIndex);
+            nameInput.setAttribute('aria-label', 'Variant ' + (variantIndex + 1) + ' name');
+            nameInput.setAttribute('maxlength', '60');
+            (function(idx) {
+                nameInput.addEventListener('input', function() {
+                    liveVariantNames[idx] = nameInput.value;
+                });
+                nameInput.addEventListener('change', function() {
+                    pushUndoSnapshot();
+                    liveVariantNames[idx] = nameInput.value;
+                    updateURL();
+                });
+            }(variantIndex));
+            heading.appendChild(nameInput);
             variantSection.appendChild(heading);
 
             gridContainer.appendChild(variantSection);
@@ -1614,6 +1689,7 @@
                     }
                     savedVariants = normalizeVariantNotesList(savedVariants, getSanitizedVariantsCount());
                     liveVariantReps = sanitizeRepsData(decompressed.reps || []);
+                    liveVariantNames = (decompressed.variantNames || []).slice();
                     
                     buildNotationGrid();
                     restoreAllVariantNotes(savedVariants);
@@ -1622,6 +1698,7 @@
                     compositionNotes.value = "";
                     variantsSelect.value = defaultVariantCount;
                     liveVariantReps = [];
+                    liveVariantNames = [];
                     updateSubdivisionDropdown();
                     handleConfigurationLifecycle(true);
                 }
@@ -1684,6 +1761,10 @@
                     if (params.has('reps')) {
                         try { liveVariantReps = sanitizeRepsData(JSON.parse(params.get('reps'))); } catch(e) { liveVariantReps = []; }
                     }
+                    liveVariantNames = [];
+                    if (params.has('variantnames')) {
+                        try { liveVariantNames = JSON.parse(params.get('variantnames')); } catch(e) { liveVariantNames = []; }
+                    }
                     
                     buildNotationGrid();
                     restoreAllVariantNotes(savedVariants);
@@ -1691,6 +1772,7 @@
                     console.error("Failed to parse tracks payload from parameter inputs", e);
                     variantsSelect.value = defaultVariantCount;
                     liveVariantReps = [];
+                    liveVariantNames = [];
                     updateSubdivisionDropdown();
                     handleConfigurationLifecycle(true);
                 }
@@ -1699,6 +1781,7 @@
                 compositionNotes.value = "";
                 variantsSelect.value = defaultVariantCount;
                 liveVariantReps = [];
+                liveVariantNames = [];
                 updateSubdivisionDropdown();
                 handleConfigurationLifecycle(true);
             }
@@ -1748,7 +1831,8 @@
                         notes: notesVal,
                         tracks: tracksPayload,
                         variants: variantCount > 1 ? variantsPayload : null,
-                        variantReps: liveVariantReps.length ? liveVariantReps.map(function(a) { return (a || []).slice(); }) : null
+                        variantReps: liveVariantReps.length ? liveVariantReps.map(function(a) { return (a || []).slice(); }) : null,
+                        variantNames: liveVariantNames.length ? liveVariantNames.slice() : null
                     }
                 };
 
@@ -1778,7 +1862,8 @@
                 notes: compositionNotes.value,
                 tracks: tracksPayload,
                 variants: variantCount > 1 ? variantsPayload : null,
-                variantReps: liveVariantReps.length ? liveVariantReps.map(function(a) { return (a || []).slice(); }) : null
+                variantReps: liveVariantReps.length ? liveVariantReps.map(function(a) { return (a || []).slice(); }) : null,
+                variantNames: liveVariantNames.length ? liveVariantNames.slice() : null
             };
 
             var json = JSON.stringify(grooveData, null, 2);
@@ -1847,6 +1932,7 @@
 
                 savedVariants = normalizeVariantNotesList(savedVariants, getSanitizedVariantsCount());
                 liveVariantReps = sanitizeRepsData(state.variantReps || []);
+                liveVariantNames = (state.variantNames || []).slice();
                 buildNotationGrid();
                 restoreAllVariantNotes(savedVariants);
                 updateURL();

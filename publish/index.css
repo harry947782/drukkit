@@ -323,6 +323,30 @@
             padding-left: 2px;
         }
 
+        .variant-name-input {
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: var(--accent-color);
+            background: transparent;
+            border: none;
+            border-bottom: 1px dashed transparent;
+            outline: none;
+            padding: 0;
+            margin: 0;
+            width: auto;
+            min-width: 60px;
+            max-width: 300px;
+            cursor: text;
+            font-family: inherit;
+        }
+
+        .variant-name-input:hover,
+        .variant-name-input:focus {
+            border-bottom-color: var(--accent-color);
+        }
+
         .track-row {
             display: flex;
             gap: 15px;
@@ -886,6 +910,12 @@
                 color: #000000 !important;
                 break-after: avoid-page !important;
                 page-break-after: avoid !important;
+            }
+
+            .variant-name-input {
+                color: #000000 !important;
+                border-bottom-color: transparent !important;
+                pointer-events: none !important;
             }
 
             .bar-reps-row {
