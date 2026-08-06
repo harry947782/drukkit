@@ -59,6 +59,9 @@
         var liveVariantReps = [];
         var liveVariantNames = [];
 
+        var textEncoder = new TextEncoder();
+        var textDecoder = new TextDecoder();
+
         function getVariantName(variantIndex) {
             var custom = liveVariantNames[variantIndex];
             return (custom && custom.trim()) ? custom.trim() : ('Variant ' + (variantIndex + 1));
@@ -413,7 +416,7 @@
             
             // Encode title if present (using 2-byte length to support UTF-8 without corruption)
             if (hasTitle) {
-                var titleBytes = new TextEncoder().encode(titleVal);
+                var titleBytes = textEncoder.encode(titleVal);
                 // Cap at 65535 bytes (2-byte length field)
                 var titleLen = Math.min(titleBytes.length, 65535);
                 if (titleLen < titleBytes.length) {
@@ -428,7 +431,7 @@
              
             // Encode notes if present
             if (hasNotes) {
-                var notesBytes = new TextEncoder().encode(notesVal);
+                var notesBytes = textEncoder.encode(notesVal);
                 // Cap at 65535 bytes (2-byte length field)
                 var notesLen = Math.min(notesBytes.length, 65535);
                 if (notesLen < notesBytes.length) {
@@ -479,7 +482,7 @@
             if (hasNamesBit) {
                 for (var nv = 0; nv < variantCount; nv++) {
                     var nameStr = (namesArr[nv] && namesArr[nv].trim()) ? namesArr[nv].trim() : '';
-                    var nameBytes = new TextEncoder().encode(nameStr);
+                    var nameBytes = textEncoder.encode(nameStr);
                     var nameLen = Math.min(nameBytes.length, 255);
                     data.push(nameLen);
                     for (var nb = 0; nb < nameLen; nb++) {
@@ -529,7 +532,7 @@
                     for (var i = 0; i < titleLen; i++) {
                         titleBytes.push(allData.charCodeAt(idx++));
                     }
-                    titleVal = new TextDecoder().decode(new Uint8Array(titleBytes));
+                    titleVal = textDecoder.decode(new Uint8Array(titleBytes));
                 }
                 
                 // Decode notes if present
@@ -539,7 +542,7 @@
                     for (var i = 0; i < notesLen; i++) {
                         notesBytes.push(allData.charCodeAt(idx++));
                     }
-                    notesVal = new TextDecoder().decode(new Uint8Array(notesBytes));
+                    notesVal = textDecoder.decode(new Uint8Array(notesBytes));
                 }
                 
                 // Decode track count
@@ -601,7 +604,7 @@
                         for (var nb = 0; nb < nameLen; nb++) {
                             nameBytes.push(allData.charCodeAt(idx++));
                         }
-                        decompVariantNames.push(new TextDecoder().decode(new Uint8Array(nameBytes)));
+                        decompVariantNames.push(textDecoder.decode(new Uint8Array(nameBytes)));
                     }
                 }
                 
@@ -1211,9 +1214,12 @@
             nameInput.type = 'text';
             nameInput.classList.add('variant-name-input');
             nameInput.value = getVariantName(variantIndex);
-            nameInput.setAttribute('aria-label', 'Variant name');
+            nameInput.setAttribute('aria-label', 'Variant ' + (variantIndex + 1) + ' name');
             nameInput.setAttribute('maxlength', '60');
             (function(idx) {
+                nameInput.addEventListener('input', function() {
+                    liveVariantNames[idx] = nameInput.value;
+                });
                 nameInput.addEventListener('change', function() {
                     pushUndoSnapshot();
                     liveVariantNames[idx] = nameInput.value;
