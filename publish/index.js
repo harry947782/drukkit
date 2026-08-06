@@ -57,6 +57,21 @@
         var maxUndoHistorySize = 50;
         var isApplyingSnapshot = false;
 
+        var liveVariantReps = [];
+
+        function sanitizeRepsData(raw) {
+            if (!Array.isArray(raw)) return [];
+            return raw.map(function(varArr) {
+                if (!Array.isArray(varArr)) return [];
+                return varArr.map(function(v) {
+                    var n = parseInt(v, 10);
+                    if (isNaN(n) || n < 2) return 0;
+                    if (n > 8) return 8;
+                    return n;
+                });
+            });
+        }
+
         function getSanitizedBarsCount() {
             var val = parseInt(barsSelect.value, 10);
             if (isNaN(val) || val < 1) return 1;
@@ -149,7 +164,8 @@
                 instruments: liveInstrumentsMemory.map(function(inst) {
                     return { id: inst.id, defaultName: inst.defaultName, symbol: inst.symbol };
                 }),
-                variantNotes: extractAllVariantNotesStatic()
+                variantNotes: extractAllVariantNotesStatic(),
+                variantReps: liveVariantReps.map(function(arr) { return (arr || []).slice(); })
             };
         }
 
@@ -176,6 +192,8 @@
             liveInstrumentsMemory = snapshot.instruments.map(function(inst) {
                 return { id: inst.id, defaultName: inst.defaultName, symbol: inst.symbol };
             });
+
+            liveVariantReps = sanitizeRepsData(snapshot.variantReps || []);
 
             projectTitle.value = snapshot.title;
             document.title = snapshot.title;
@@ -412,8 +430,9 @@
 
         // Compression/decompression functions for QR code URL optimization
         var MAX_URL_LENGTH = 2000;
-        function compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload) {
+        function compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, repsData) {
             // Bit layout (16-bit value):
+            //   Bit 14: hasReps flag
             //   Bit positions 10-13: variant count - 1 (4-bit field, supports 1-16 variants)
             //   Bit 9:  hasNotes flag
             //   Bit 8:  hasTitle flag
@@ -429,8 +448,15 @@
             var hasNotes = (notesVal && notesVal.length > 0) ? 1 : 0;
             var variantCount = Math.max(1, Math.min((variantsPayload && variantsPayload.length) || 1, 16));
             var variantBits = (variantCount - 1) & 0xF;
+
+            var repsArr = repsData || [];
+            var hasRepsBit = 0;
+            for (var ri = 0; ri < repsArr.length && !hasRepsBit; ri++) {
+                var ra = repsArr[ri] || [];
+                for (var rb = 0; rb < ra.length; rb++) { if (ra[rb] >= 2) { hasRepsBit = 1; break; } }
+            }
             
-            var metadata = (variantBits << 10) | (timeBits << 6) | (barsBits << 2) | (subBits << 0) | (hasTitle << 8) | (hasNotes << 9);
+            var metadata = (variantBits << 10) | (timeBits << 6) | (barsBits << 2) | (subBits << 0) | (hasTitle << 8) | (hasNotes << 9) | (hasRepsBit << 14);
             
             // Build compressed data with proper byte order
             var data = [];
@@ -487,6 +513,19 @@
                     appendCompressedTrack(data, tracksPayload[t]);
                 }
             }
+
+            // Encode per-variant reps data (2 nibbles per byte: bars packed in pairs)
+            if (hasRepsBit) {
+                var barsCount = parseInt(barsVal, 10) || 1;
+                for (var rv = 0; rv < variantCount; rv++) {
+                    var repsBarsArr = (repsArr[rv] || []);
+                    for (var rb = 0; rb < barsCount; rb += 2) {
+                        var n0 = (repsBarsArr[rb] || 0) & 0xF;
+                        var n1 = (rb + 1 < barsCount) ? ((repsBarsArr[rb + 1] || 0) & 0xF) : 0;
+                        data.push(n0 | (n1 << 4));
+                    }
+                }
+            }
             
             // Convert data array to binary string and encode as base64
             var binaryString = '';
@@ -502,7 +541,7 @@
                 var idx = 0;
                 
                 // Decode metadata (2 bytes)
-                // Bit layout: bits 13-10 (variant count), bit 9 (hasNotes), bit 8 (hasTitle), bits 6-7 (time), bits 2-5 (bars), bits 0-1 (sub)
+                // Bit layout: bits 14 (hasReps), bits 13-10 (variant count), bit 9 (hasNotes), bit 8 (hasTitle), bits 6-7 (time), bits 2-5 (bars), bits 0-1 (sub)
                 var metadata = (allData.charCodeAt(idx++) << 8) | allData.charCodeAt(idx++);
                 var variantCount = ((metadata >> 10) & 0xF) + 1;
                 var timeBits = (metadata >> 6) & 0x3;
@@ -510,6 +549,7 @@
                 var subBits = (metadata >> 0) & 0x3;
                 var hasTitle = (metadata >> 8) & 0x1;
                 var hasNotes = (metadata >> 9) & 0x1;
+                var hasReps = (metadata >> 14) & 0x1;
                 
                 var timeReverseMap = {0: '4/4', 1: '3/4', 2: '2/2', 3: '6/8'};
                 var subReverseMap = {0: 'quarter', 1: '8th', 2: '12th', 3: '16th'};
@@ -574,6 +614,21 @@
                         decompTracks.push(trackData.track);
                     }
                 }
+
+                // Decode per-variant reps if present (2 nibbles packed per byte)
+                var decompReps = [];
+                if (hasReps) {
+                    var repsBarsCount = barsBits + 1;
+                    for (var rv = 0; rv < variantCount; rv++) {
+                        var repsBarArr = [];
+                        for (var rb = 0; rb < repsBarsCount; rb += 2) {
+                            var repsByte = allData.charCodeAt(idx++);
+                            repsBarArr.push(repsByte & 0xF);
+                            if (rb + 1 < repsBarsCount) repsBarArr.push((repsByte >> 4) & 0xF);
+                        }
+                        decompReps.push(repsBarArr);
+                    }
+                }
                 
                 return {
                     time: timeVal,
@@ -582,7 +637,8 @@
                     title: titleVal,
                     notes: notesVal,
                     tracks: decompTracks,
-                    variants: decompVariants
+                    variants: decompVariants,
+                    reps: decompReps
                 };
             } catch (e) {
                 console.error("Failed to decompress state", e);
@@ -623,6 +679,12 @@
             if (hasBeatSubOverrides) {
                 params.set('beatSubs', JSON.stringify(beatSubOverrides));
             }
+            var hasAnyReps = false;
+            for (var ri = 0; ri < liveVariantReps.length && !hasAnyReps; ri++) {
+                var ra = liveVariantReps[ri] || [];
+                for (var rb = 0; rb < ra.length; rb++) { if (ra[rb] >= 2) { hasAnyReps = true; break; } }
+            }
+            if (hasAnyReps) params.set('reps', JSON.stringify(liveVariantReps));
 
             var newUrl = buildBaseUrl() + '?' + params.toString();
 
@@ -631,7 +693,7 @@
             // The compressed value is also reused for the QR code below to avoid compressing twice.
             var compressed = null;
             if (!hasBeatSubOverrides && newUrl.length > MAX_URL_LENGTH) {
-                compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload);
+                compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, liveVariantReps);
                 var compressedParams = new URLSearchParams();
                 compressedParams.set('c', compressed);
                 newUrl = buildBaseUrl() + '?' + compressedParams.toString();
@@ -653,7 +715,7 @@
                     }
                 } else {
                     if (!compressed) {
-                        compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload);
+                        compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, liveVariantReps);
                     }
                     var qrParams = new URLSearchParams();
                     qrParams.set('c', compressed);
@@ -821,6 +883,10 @@
                 newVariants.push(newNotes);
             }
 
+            for (var rv = 0; rv < liveVariantReps.length; rv++) {
+                if (liveVariantReps[rv]) liveVariantReps[rv].splice(targetBarIdx, 1);
+            }
+
             barsSelect.value = currentBars - 1;
             buildNotationGrid();
             restoreAllVariantNotes(newVariants);
@@ -873,6 +939,13 @@
                     }
                 }
                 newVariants.push(newNotes);
+            }
+
+            for (var rv = 0; rv < liveVariantReps.length; rv++) {
+                if (liveVariantReps[rv]) {
+                    if (type === 'start') { liveVariantReps[rv].unshift(0); }
+                    else { liveVariantReps[rv].push(0); }
+                }
             }
 
             barsSelect.value = currentBars + 1;
@@ -1143,6 +1216,114 @@
 
             headerRow.appendChild(stepsContainer);
             gridContainer.appendChild(headerRow);
+        }
+
+        function buildRepsRowElement(variantIndex, totalBars, barWidth, gridStyleString) {
+            var row = document.createElement('div');
+            row.classList.add('bar-reps-row');
+            row.setAttribute('data-variant', variantIndex);
+
+            var labelSpacer = document.createElement('div');
+            labelSpacer.classList.add('label-ctrls', 'reps-label-spacer');
+            row.appendChild(labelSpacer);
+
+            var grid = document.createElement('div');
+            grid.classList.add('grid-steps', 'reps-grid');
+            grid.style.gridTemplateColumns = gridStyleString;
+
+            var startGap = document.createElement('div');
+            startGap.classList.add('gap-bar-line');
+            grid.appendChild(startGap);
+
+            var repsArray = liveVariantReps[variantIndex] || [];
+
+            for (var b = 0; b < totalBars; b++) {
+                if (b > 0) {
+                    var barGap = document.createElement('div');
+                    barGap.classList.add('gap-bar-line');
+                    grid.appendChild(barGap);
+                }
+
+                var cell = document.createElement('div');
+                cell.classList.add('bar-reps-cell');
+                cell.style.gridColumn = 'span ' + barWidth;
+                var reps = repsArray[b] || 0;
+                if (reps >= 2) {
+                    cell.textContent = reps + 'x';
+                    cell.classList.add('has-reps');
+                }
+
+                (function(barIdx, cellEl) {
+                    function activateRepsInput(cellEl, currentVal) {
+                        if (cellEl.querySelector('input')) return;
+                        cellEl.textContent = '';
+                        var inp = document.createElement('input');
+                        inp.type = 'number';
+                        inp.min = '2';
+                        inp.max = '99';
+                        inp.value = currentVal;
+                        inp.className = 'reps-inline-input';
+                        cellEl.appendChild(inp);
+                        inp.focus();
+                        inp.select();
+                        function commitInput() {
+                            var v = parseInt(inp.value, 10);
+                            if (!liveVariantReps[variantIndex]) liveVariantReps[variantIndex] = [];
+                            if (isNaN(v) || v < 2) {
+                                liveVariantReps[variantIndex][barIdx] = 0;
+                                cellEl.textContent = '';
+                                cellEl.classList.remove('has-reps');
+                            } else {
+                                liveVariantReps[variantIndex][barIdx] = v;
+                                cellEl.textContent = v + 'x';
+                                cellEl.classList.add('has-reps');
+                            }
+                            updateURL();
+                        }
+                        inp.onblur = commitInput;
+                        inp.onkeydown = function(ev) {
+                            if (ev.key === 'Enter') { inp.blur(); }
+                            else if (ev.key === 'Escape') {
+                                inp.onblur = null;
+                                var prev = liveVariantReps[variantIndex] ? (liveVariantReps[variantIndex][barIdx] || 0) : 0;
+                                if (prev >= 2) {
+                                    cellEl.textContent = prev + 'x';
+                                    cellEl.classList.add('has-reps');
+                                } else {
+                                    cellEl.textContent = '';
+                                    cellEl.classList.remove('has-reps');
+                                }
+                            }
+                            ev.stopPropagation();
+                        };
+                        inp.onclick = function(ev) { ev.stopPropagation(); };
+                    }
+
+                    cellEl.onclick = function(e) {
+                        e.stopPropagation();
+                        if (!liveVariantReps[variantIndex]) liveVariantReps[variantIndex] = [];
+                        var current = liveVariantReps[variantIndex][barIdx] || 0;
+                        if (current < 2) {
+                            pushUndoSnapshot();
+                            liveVariantReps[variantIndex][barIdx] = 2;
+                            cellEl.textContent = '2x';
+                            cellEl.classList.add('has-reps');
+                            updateURL();
+                        } else {
+                            activateRepsInput(cellEl, current);
+                        }
+                    };
+                })(b, cell);
+
+                grid.appendChild(cell);
+            }
+
+            var endGap = document.createElement('div');
+            endGap.classList.add('gap-bar-line');
+            grid.appendChild(endGap);
+
+            row.appendChild(grid);
+            return row;
         }
 
         function createVariantSection(variantIndex) {
@@ -1438,8 +1619,10 @@
 
             buildGridHeaderElement(totalBars, beatsPerBar, beatMultipliers, globalCachedGridTemplate, sig);
 
+            var barWidth = beatsPerBar * (multiplier + 1) - 1;
             for (var variantIndex = 0; variantIndex < totalVariants; variantIndex++) {
                 var variantSection = createVariantSection(variantIndex);
+                variantSection.appendChild(buildRepsRowElement(variantIndex, totalBars, barWidth, globalCachedGridTemplate));
                 for (var idx = 0; idx < liveInstrumentsMemory.length; idx++) {
                     appendSingleRowElement(
                         liveInstrumentsMemory[idx],
@@ -1607,6 +1790,7 @@
                         }
                     }
                     savedVariants = normalizeVariantNotesList(savedVariants, getSanitizedVariantsCount());
+                    liveVariantReps = sanitizeRepsData(decompressed.reps || []);
                     
                     buildNotationGrid();
                     restoreAllVariantNotes(savedVariants);
@@ -1614,6 +1798,7 @@
                     document.title = projectTitle.value;
                     compositionNotes.value = "";
                     variantsSelect.value = defaultVariantCount;
+                    liveVariantReps = [];
                     updateSubdivisionDropdown();
                     handleConfigurationLifecycle(true);
                 }
@@ -1686,12 +1871,17 @@
                         savedVariants.push(sharedNotes);
                     }
                     savedVariants = normalizeVariantNotesList(savedVariants, getSanitizedVariantsCount());
+                    liveVariantReps = [];
+                    if (params.has('reps')) {
+                        try { liveVariantReps = sanitizeRepsData(JSON.parse(params.get('reps'))); } catch(e) { liveVariantReps = []; }
+                    }
                     
                     buildNotationGrid();
                     restoreAllVariantNotes(savedVariants);
                 } catch (e) {
                     console.error("Failed to parse tracks payload from parameter inputs", e);
                     variantsSelect.value = defaultVariantCount;
+                    liveVariantReps = [];
                     updateSubdivisionDropdown();
                     handleConfigurationLifecycle(true);
                 }
@@ -1699,6 +1889,7 @@
                 document.title = projectTitle.value;
                 compositionNotes.value = "";
                 variantsSelect.value = defaultVariantCount;
+                liveVariantReps = [];
                 updateSubdivisionDropdown();
                 handleConfigurationLifecycle(true);
             }
@@ -1747,7 +1938,8 @@
                         sub: subVal,
                         notes: notesVal,
                         tracks: tracksPayload,
-                        variants: variantCount > 1 ? variantsPayload : null
+                        variants: variantCount > 1 ? variantsPayload : null,
+                        variantReps: liveVariantReps.length ? liveVariantReps.map(function(a) { return (a || []).slice(); }) : null
                     }
                 };
 
@@ -1776,7 +1968,8 @@
                 sub: subdivisionSelect.value,
                 notes: compositionNotes.value,
                 tracks: tracksPayload,
-                variants: variantCount > 1 ? variantsPayload : null
+                variants: variantCount > 1 ? variantsPayload : null,
+                variantReps: liveVariantReps.length ? liveVariantReps.map(function(a) { return (a || []).slice(); }) : null
             };
 
             var json = JSON.stringify(grooveData, null, 2);
@@ -1844,6 +2037,7 @@
                 }
 
                 savedVariants = normalizeVariantNotesList(savedVariants, getSanitizedVariantsCount());
+                liveVariantReps = sanitizeRepsData(state.variantReps || []);
                 buildNotationGrid();
                 restoreAllVariantNotes(savedVariants);
                 updateURL();
