@@ -78,6 +78,7 @@ test('loads the default groove and share state', async ({ page }) => {
   await expect(page.locator('#headerMenuPanel')).toBeHidden();
   await expect(page.locator('#barsSelect')).toHaveValue('2');
   await expect(page.locator('#subdivisionSelect')).toHaveValue('16th');
+  await expect(page.locator('#densitySelect')).toHaveValue('comfortable');
 
   expect(await activeSteps(page, 'hihat')).toEqual([
     { index: 0, state: 'A', accent: false },
@@ -594,6 +595,7 @@ test('switches to compressed URL format when state exceeds 2000 characters', asy
     time: '4/4',
     bars: '4',
     sub: '16th',
+    density: 'dense',
     notes: '',
     tracks: JSON.stringify(tracks)
   });
@@ -612,9 +614,78 @@ test('switches to compressed URL format when state exceeds 2000 characters', asy
   await expect(page.locator('#timeSigSelect')).toHaveValue('4/4');
   await expect(page.locator('#barsSelect')).toHaveValue('4');
   await expect(page.locator('#subdivisionSelect')).toHaveValue('16th');
+  await expect(page.locator('#densitySelect')).toHaveValue('dense');
   expect(await activeSteps(page, 'hihat')).toHaveLength(16);
   expect(await activeSteps(page, 'snare')).toHaveLength(16);
   expect(await activeSteps(page, 'bass')).toHaveLength(16);
+});
+
+test('persists density mode and compresses layout spacing for wider grooves', async ({ page }) => {
+  await gotoApp(page);
+  await openHeaderMenu(page);
+
+  const comfortableSpacing = await page.evaluate(() => {
+    const styles = getComputedStyle(document.documentElement);
+    return {
+      barGap: parseFloat(styles.getPropertyValue('--layout-bar-gap')),
+      beatGap: parseFloat(styles.getPropertyValue('--layout-beat-gap')),
+      gridGap: parseFloat(styles.getPropertyValue('--layout-grid-gap'))
+    };
+  });
+
+  await page.locator('#densitySelect').selectOption('dense');
+  await page.locator('#barsSelect').fill('16');
+
+  const denseSpacing = await page.evaluate(() => {
+    const styles = getComputedStyle(document.documentElement);
+    return {
+      barGap: parseFloat(styles.getPropertyValue('--layout-bar-gap')),
+      beatGap: parseFloat(styles.getPropertyValue('--layout-beat-gap')),
+      gridGap: parseFloat(styles.getPropertyValue('--layout-grid-gap')),
+      search: window.location.search
+    };
+  });
+
+  expect(denseSpacing.barGap).toBeLessThan(comfortableSpacing.barGap);
+  expect(denseSpacing.beatGap).toBeLessThan(comfortableSpacing.beatGap);
+  expect(denseSpacing.gridGap).toBeLessThan(comfortableSpacing.gridGap);
+  expect(denseSpacing.search).toContain('density=dense');
+
+  await page.reload();
+  await openHeaderMenu(page);
+  await expect(page.locator('#densitySelect')).toHaveValue('dense');
+  await expect(page.locator('#barsSelect')).toHaveValue('16');
+});
+
+test('uses content-driven track widths on screen and print', async ({ page }) => {
+  await gotoApp(page);
+
+  const widths = await page.evaluate(() => {
+    const styles = getComputedStyle(document.documentElement);
+    return {
+      screen: parseFloat(styles.getPropertyValue('--track-label-width')),
+      print: parseFloat(styles.getPropertyValue('--print-track-label-width'))
+    };
+  });
+
+  expect(widths.screen).toBeLessThan(220);
+  expect(widths.print).toBeLessThan(widths.screen);
+
+  await page.emulateMedia({ media: 'print' });
+
+  const alignment = await page.evaluate(() => {
+    const headerGrid = document.querySelector('.track-row.header-row .grid-steps').getBoundingClientRect();
+    const firstTrackGrid = document.querySelector('.track-row[data-variant="0"] .grid-steps').getBoundingClientRect();
+    const labelWidth = getComputedStyle(document.querySelector('.track-row[data-variant="0"] .label-ctrls')).width;
+    return {
+      headerLeft: headerGrid.left,
+      rowLeft: firstTrackGrid.left,
+      labelWidth
+    };
+  });
+
+  expect(Math.abs(alignment.headerLeft - alignment.rowLeft)).toBeLessThan(1);
+  expect(parseFloat(alignment.labelWidth)).toBeCloseTo(widths.print, 0);
 });
 
 test('keeps uncompressed URL format when state is under 2000 characters', async ({ page }) => {
