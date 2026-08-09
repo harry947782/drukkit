@@ -371,6 +371,7 @@
             align-items: center;
             width: var(--track-label-width);
             gap: 6px;
+            min-width: 0;
             flex-shrink: 0;
         }
 
@@ -396,6 +397,20 @@
             padding: 6px;
             border-radius: 4px;
             min-width: 0;
+        }
+
+        .instrument-label-print {
+            display: none;
+            flex: 1;
+            min-width: 0;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 13px;
+            letter-spacing: 1px;
+            color: var(--text-color);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .instrument-label-input:hover {
@@ -1061,12 +1076,12 @@
             }
 
             .instrument-label-input {
+                display: none !important;
+            }
+
+            .instrument-label-print {
+                display: block !important;
                 color: #000000 !important;
-                border: none !important;
-                background: transparent !important;
-                padding: 0 !important;
-                pointer-events: none !important;
-                width: 100% !important;
             }
 
             /* Maintain physical bounding frame symmetry for both empty and active grid elements */

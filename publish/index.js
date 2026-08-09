@@ -43,6 +43,7 @@
 
         var globalCachedGridTemplate = "";
         var globalCachedTotalSteps = 0;
+        var globalCachedLayoutMetrics = null;
         var beatSubOverrides = {};
         var dragSrcRow = null;
         var defaultProjectTitle = "My Drum Groove Composition";
@@ -165,7 +166,7 @@
         }
 
         function getLongestTrackLabelWidth() {
-            var widest = measureLabelTextWidth('Track / Beat');
+            var widest = measureLabelTextWidth('Track');
             for (var i = 0; i < liveInstrumentsMemory.length; i++) {
                 widest = Math.max(widest, measureLabelTextWidth(liveInstrumentsMemory[i].defaultName || ''));
             }
@@ -237,9 +238,29 @@
             document.documentElement.style.setProperty('--layout-symbol-scale', layoutMetrics.symbolScale + '%');
         }
 
+        function applyLabelColumnWidth(widthValue) {
+            var widthPx = formatPx(widthValue);
+            var labelColumns = document.querySelectorAll('.label-ctrls');
+            for (var i = 0; i < labelColumns.length; i++) {
+                labelColumns[i].style.width = widthPx;
+                labelColumns[i].style.minWidth = widthPx;
+                labelColumns[i].style.maxWidth = widthPx;
+            }
+        }
+
         function refreshLayoutSizing() {
-            applySharedLayoutSizing(computeSharedLayoutSizing(deriveCurrentLayoutContext()));
+            globalCachedLayoutMetrics = computeSharedLayoutSizing(deriveCurrentLayoutContext());
+            applySharedLayoutSizing(globalCachedLayoutMetrics);
+            if (document.querySelector('.label-ctrls')) {
+                var isPrintMedia = window.matchMedia && window.matchMedia('print').matches;
+                applyLabelColumnWidth(isPrintMedia ? globalCachedLayoutMetrics.printTrackLabelWidth : globalCachedLayoutMetrics.trackLabelWidth);
+            }
             updatePrintLayoutPreference();
+        }
+
+        function syncTrackInputSizing(inputEl, value) {
+            if (!inputEl) return;
+            inputEl.size = Math.max((value || '').length, 1);
         }
 
         function getEffectiveBeatMultiplier(beatIndex, globalMultiplier) {
@@ -1649,19 +1670,31 @@
             input.type = 'text';
             input.classList.add('instrument-label-input');
             input.value = inst.defaultName;
+            syncTrackInputSizing(input, inst.defaultName);
+
+            var printLabel = document.createElement('span');
+            printLabel.classList.add('instrument-label-print');
+            printLabel.textContent = inst.defaultName;
             input.oninput = function() {
                 pushUndoSnapshot();
                 inst.defaultName = this.value;
+                syncTrackInputSizing(this, inst.defaultName);
                 var peerInputs = document.querySelectorAll('.track-row[data-instrument="' + inst.id + '"] .instrument-label-input');
+                var peerPrintLabels = document.querySelectorAll('.track-row[data-instrument="' + inst.id + '"] .instrument-label-print');
                 for (var p = 0; p < peerInputs.length; p++) {
                     if (peerInputs[p] !== this) {
                         peerInputs[p].value = inst.defaultName;
+                        syncTrackInputSizing(peerInputs[p], inst.defaultName);
                     }
+                }
+                for (var q = 0; q < peerPrintLabels.length; q++) {
+                    peerPrintLabels[q].textContent = inst.defaultName;
                 }
                 refreshLayoutSizing();
                 updateURL();
             };
             labelCtrls.appendChild(input);
+            labelCtrls.appendChild(printLabel);
 
             var delBtn = document.createElement('button');
             delBtn.classList.add('delete-track-btn');
@@ -1819,7 +1852,8 @@
             gridContainer.innerHTML = '';
             var layoutContext = deriveCurrentLayoutContext();
             globalCachedTotalSteps = layoutContext.totalSteps;
-            applySharedLayoutSizing(computeSharedLayoutSizing(layoutContext));
+            globalCachedLayoutMetrics = computeSharedLayoutSizing(layoutContext);
+            applySharedLayoutSizing(globalCachedLayoutMetrics);
 
             var trackColumnsTemplate = [];
             trackColumnsTemplate.push('var(--layout-bar-gap)'); 
@@ -1856,6 +1890,7 @@
                 }
             }
 
+            applyLabelColumnWidth((window.matchMedia && window.matchMedia('print').matches) ? globalCachedLayoutMetrics.printTrackLabelWidth : globalCachedLayoutMetrics.trackLabelWidth);
             updatePrintLayoutPreference();
             return { sig: layoutContext.sig, multiplier: layoutContext.multiplier, beatMultipliers: layoutContext.beatMultipliers, stepsPerBar: layoutContext.stepsPerBar, totalBars: layoutContext.totalBars };
         }
@@ -1934,6 +1969,22 @@
                 shouldUsePortrait = true;
             }
             document.body.classList.add(shouldUsePortrait ? 'print-portrait' : 'print-landscape');
+        }
+
+        function preparePrintLayout() {
+            refreshLayoutSizing();
+            if (globalCachedLayoutMetrics) {
+                applyLabelColumnWidth(globalCachedLayoutMetrics.printTrackLabelWidth);
+            }
+            updatePrintLayoutPreference();
+        }
+
+        function restoreScreenLayout() {
+            refreshLayoutSizing();
+            if (globalCachedLayoutMetrics) {
+                applyLabelColumnWidth(globalCachedLayoutMetrics.trackLabelWidth);
+            }
+            updatePrintLayoutPreference();
         }
 
         function handleConfigurationLifecycle(loadDefaultRhythm) {
@@ -2599,8 +2650,8 @@
             }
         });
 
-        window.addEventListener('beforeprint', updatePrintLayoutPreference);
-        window.addEventListener('afterprint', updatePrintLayoutPreference);
+        window.addEventListener('beforeprint', preparePrintLayout);
+        window.addEventListener('afterprint', restoreScreenLayout);
 
         // Initialize App Runtime
         initFromURLOrDefaults();

@@ -492,6 +492,7 @@ test('uses print-safe variant sections and portrait mode for narrow stacked layo
   await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
   await expect(page.locator('body')).toHaveClass(/print-portrait/);
   await page.emulateMedia({ media: 'print' });
+  await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
 
   await expect(page.locator('body')).toHaveClass(/print-portrait/);
 
@@ -686,6 +687,8 @@ test('uses content-driven track widths on screen and print', async ({ page }) =>
 
   expect(Math.abs(alignment.headerLeft - alignment.rowLeft)).toBeLessThan(1);
   expect(parseFloat(alignment.labelWidth)).toBeCloseTo(widths.print, 0);
+
+  await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
 });
 
 test('keeps uncompressed URL format when state is under 2000 characters', async ({ page }) => {
