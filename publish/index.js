@@ -34,6 +34,7 @@
         var timeSigSelect = document.getElementById('timeSigSelect');
         var barsSelect = document.getElementById('barsSelect');
         var variantsSelect = document.getElementById('variantsSelect');
+        var variantsPerPageSelect = document.getElementById('variantsPerPageSelect');
         var subdivisionSelect = document.getElementById('subdivisionSelect');
         var densitySelect = document.getElementById('densitySelect');
         var addTrackBtn = document.getElementById('addTrackBtn');
@@ -129,6 +130,29 @@
             if (isNaN(val) || val < 1) return 1;
             if (val > 8) return 8;
             return val;
+        }
+
+        function getSanitizedVariantsPerPageCount() {
+            if (!variantsPerPageSelect || variantsPerPageSelect.value === 'auto') return 0;
+            var val = parseInt(variantsPerPageSelect.value, 10);
+            if (isNaN(val) || val < 1) return 0;
+            if (val > 8) return 8;
+            return val;
+        }
+
+        function setVariantsPerPageValue(rawValue) {
+            if (!variantsPerPageSelect) return;
+            if (rawValue === null || rawValue === undefined || rawValue === '' || rawValue === 'auto') {
+                variantsPerPageSelect.value = 'auto';
+                return;
+            }
+            var val = parseInt(rawValue, 10);
+            if (isNaN(val) || val < 1) {
+                variantsPerPageSelect.value = 'auto';
+                return;
+            }
+            if (val > 8) val = 8;
+            variantsPerPageSelect.value = String(val);
         }
 
         function clampNumber(value, min, max) {
@@ -432,45 +456,54 @@
             var variantSections = getDirectVariantSections();
             if (variantSections.length < 2) return;
 
-            var pageHeights = getPrintPageHeightEstimate();
-            var groupGap = parseFloat(window.getComputedStyle(gridContainer).gap) || 0;
-            var variantHeights = [];
-            for (var i = 0; i < variantSections.length; i++) {
-                variantHeights.push(variantSections[i].getBoundingClientRect().height);
-            }
+            var manualVariantsPerPage = getSanitizedVariantsPerPageCount();
+            var pageCounts = [];
 
-            var requiredPageCount = 1;
-            var remainingHeight = pageHeights.firstPage;
-            var currentLimit = pageHeights.firstPage;
-            for (var v = 0; v < variantHeights.length; v++) {
-                var variantHeight = variantHeights[v];
-                var neededHeight = variantHeight + ((remainingHeight === currentLimit) ? 0 : groupGap);
-                if (neededHeight <= remainingHeight || variantHeight > currentLimit) {
-                    remainingHeight -= neededHeight;
-                } else {
-                    requiredPageCount++;
-                    currentLimit = pageHeights.followingPages;
-                    remainingHeight = currentLimit - variantHeight;
+            if (manualVariantsPerPage > 0) {
+                for (var mv = 0; mv < variantSections.length; mv += manualVariantsPerPage) {
+                    pageCounts.push(Math.min(manualVariantsPerPage, variantSections.length - mv));
                 }
-            }
+            } else {
+                var pageHeights = getPrintPageHeightEstimate();
+                var groupGap = parseFloat(window.getComputedStyle(gridContainer).gap) || 0;
+                var variantHeights = [];
+                for (var i = 0; i < variantSections.length; i++) {
+                    variantHeights.push(variantSections[i].getBoundingClientRect().height);
+                }
 
-            if (requiredPageCount <= 1) return;
-
-            var pageCounts = buildBalancedPageCounts(variantSections.length, requiredPageCount);
-            var pageStart = 0;
-            for (var pageIndex = 0; pageIndex < pageCounts.length; pageIndex++) {
-                var pageLimit = pageIndex === 0 ? pageHeights.firstPage : pageHeights.followingPages;
-                while (
-                    pageCounts[pageIndex] > 1 &&
-                    measureVariantGroupHeight(variantHeights, pageStart, pageCounts[pageIndex], groupGap) > pageLimit
-                ) {
-                    pageCounts[pageIndex]--;
-                    if (pageIndex + 1 >= pageCounts.length) {
-                        pageCounts.push(0);
+                var requiredPageCount = 1;
+                var remainingHeight = pageHeights.firstPage;
+                var currentLimit = pageHeights.firstPage;
+                for (var v = 0; v < variantHeights.length; v++) {
+                    var variantHeight = variantHeights[v];
+                    var neededHeight = variantHeight + ((remainingHeight === currentLimit) ? 0 : groupGap);
+                    if (neededHeight <= remainingHeight || variantHeight > currentLimit) {
+                        remainingHeight -= neededHeight;
+                    } else {
+                        requiredPageCount++;
+                        currentLimit = pageHeights.followingPages;
+                        remainingHeight = currentLimit - variantHeight;
                     }
-                    pageCounts[pageIndex + 1]++;
                 }
-                pageStart += pageCounts[pageIndex];
+
+                if (requiredPageCount <= 1) return;
+
+                pageCounts = buildBalancedPageCounts(variantSections.length, requiredPageCount);
+                var pageStart = 0;
+                for (var pageIndex = 0; pageIndex < pageCounts.length; pageIndex++) {
+                    var pageLimit = pageIndex === 0 ? pageHeights.firstPage : pageHeights.followingPages;
+                    while (
+                        pageCounts[pageIndex] > 1 &&
+                        measureVariantGroupHeight(variantHeights, pageStart, pageCounts[pageIndex], groupGap) > pageLimit
+                    ) {
+                        pageCounts[pageIndex]--;
+                        if (pageIndex + 1 >= pageCounts.length) {
+                            pageCounts.push(0);
+                        }
+                        pageCounts[pageIndex + 1]++;
+                    }
+                    pageStart += pageCounts[pageIndex];
+                }
             }
 
             var headerRow = gridContainer.querySelector('.track-row.header-row');
@@ -500,6 +533,7 @@
                 time: timeSigSelect.value,
                 bars: barsSelect.value,
                 variants: variantsSelect.value,
+                variantsPerPage: variantsPerPageSelect ? variantsPerPageSelect.value : 'auto',
                 sub: subdivisionSelect.value,
                 density: getDensityValue(),
                 beatSubOverrides: JSON.parse(JSON.stringify(beatSubOverrides)),
@@ -546,6 +580,7 @@
             timeSigSelect.value = snapshot.time;
             barsSelect.value = snapshot.bars;
             variantsSelect.value = snapshot.variants;
+            setVariantsPerPageValue(snapshot.variantsPerPage);
             if (densitySelect) densitySelect.value = densityModes[snapshot.density] ? snapshot.density : 'comfortable';
 
             var options = timeSigConfig[snapshot.time].subs;
@@ -1051,6 +1086,7 @@
             var timeVal = timeSigSelect.value;
             var barsVal = barsSelect.value;
             var variantCount = getSanitizedVariantsCount();
+            var variantsPerPageCount = getSanitizedVariantsPerPageCount();
             var subVal = subdivisionSelect.value;
             var densityVal = getDensityValue();
             var notesVal = compositionNotes.value;
@@ -1070,6 +1106,9 @@
             params.set('tracks', JSON.stringify(tracksPayload));
             if (variantCount > 1) {
                 params.set('variants', JSON.stringify(variantsPayload));
+            }
+            if (variantsPerPageCount > 0) {
+                params.set('vpp', String(variantsPerPageCount));
             }
             var hasBeatSubOverrides = Object.keys(beatSubOverrides).length > 0;
             if (hasBeatSubOverrides) {
@@ -1101,6 +1140,7 @@
                 compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, liveVariantReps, liveVariantNames, densityVal);
                 var compressedParams = new URLSearchParams();
                 compressedParams.set('c', compressed);
+                if (variantsPerPageCount > 0) compressedParams.set('vpp', String(variantsPerPageCount));
                 newUrl = buildBaseUrl() + '?' + compressedParams.toString();
             }
 
@@ -1124,6 +1164,7 @@
                     }
                     var qrParams = new URLSearchParams();
                     qrParams.set('c', compressed);
+                    if (variantsPerPageCount > 0) qrParams.set('vpp', String(variantsPerPageCount));
                     qrUrl = buildBaseUrl() + '?' + qrParams.toString();
                     printQrCode.src = "https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=" + encodeURIComponent(qrUrl);
                 }
@@ -2177,6 +2218,7 @@
             var params = new URLSearchParams(window.location.search);
             var defaultVariantCount = 1;
             beatSubOverrides = {};
+            setVariantsPerPageValue(params.get('vpp'));
             
             // Check for compressed format first
             if (params.has('c')) {
@@ -2238,6 +2280,7 @@
                     document.title = projectTitle.value;
                     compositionNotes.value = "";
                     variantsSelect.value = defaultVariantCount;
+                    setVariantsPerPageValue('auto');
                     liveVariantReps = [];
                     liveVariantNames = [];
                     updateSubdivisionDropdown();
@@ -2328,6 +2371,7 @@
                 } catch (e) {
                     console.error("Failed to parse tracks payload from parameter inputs", e);
                     variantsSelect.value = defaultVariantCount;
+                    setVariantsPerPageValue('auto');
                     liveVariantReps = [];
                     liveVariantNames = [];
                     updateSubdivisionDropdown();
@@ -2337,6 +2381,7 @@
                 document.title = projectTitle.value;
                 compositionNotes.value = "";
                 variantsSelect.value = defaultVariantCount;
+                setVariantsPerPageValue('auto');
                 if (densitySelect) densitySelect.value = 'comfortable';
                 liveVariantReps = [];
                 liveVariantNames = [];
@@ -2371,6 +2416,7 @@
                 var barsVal = barsSelect.value;
                 var variantCount = getSanitizedVariantsCount();
                 var subVal = subdivisionSelect.value;
+                var variantsPerPageVal = getSanitizedVariantsPerPageCount();
                 var densityVal = getDensityValue();
                 var notesVal = compositionNotes.value;
                 var savedVariants = normalizeVariantNotesList(extractAllVariantNotes(), variantCount);
@@ -2389,6 +2435,7 @@
                         sub: subVal,
                         density: densityVal,
                         notes: notesVal,
+                        variantsPerPage: variantsPerPageVal > 0 ? variantsPerPageVal : null,
                         tracks: tracksPayload,
                         variants: variantCount > 1 ? variantsPayload : null,
                         variantReps: liveVariantReps.length ? liveVariantReps.map(function(a) { return (a || []).slice(); }) : null,
@@ -2419,6 +2466,7 @@
                 time: timeSigSelect.value,
                 bars: barsSelect.value,
                 sub: subdivisionSelect.value,
+                variantsPerPage: getSanitizedVariantsPerPageCount() || null,
                 density: getDensityValue(),
                 notes: compositionNotes.value,
                 tracks: tracksPayload,
@@ -2456,6 +2504,7 @@
                 subdivisionSelect.value = state.sub;
                 if (densitySelect) densitySelect.value = densityModes[state.density] ? state.density : 'comfortable';
                 compositionNotes.value = state.notes;
+                setVariantsPerPageValue(state.variantsPerPage);
 
                 updateSubdivisionDropdown();
                 subdivisionSelect.value = state.sub;
@@ -2670,6 +2719,18 @@
             handleConfigurationLifecycle(false);
             updateURL();
         };
+
+        if (variantsPerPageSelect) {
+            variantsPerPageSelect.onchange = function() {
+                pushUndoSnapshot();
+                var sanitized = getSanitizedVariantsPerPageCount();
+                this.value = sanitized > 0 ? String(sanitized) : 'auto';
+                updateURL();
+                if (window.matchMedia && window.matchMedia('print').matches) {
+                    rebalancePrintVariantPages();
+                }
+            };
+        }
 
         subdivisionSelect.onchange = function() {
             pushUndoSnapshot();

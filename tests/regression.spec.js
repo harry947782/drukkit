@@ -597,6 +597,31 @@ test('balances print variant counts across grouped pages when variants span mult
   await expect(page.locator('.print-page-group')).toHaveCount(0);
 });
 
+test('supports manually configured variants per print page with auto as default', async ({ page }) => {
+  await gotoApp(page);
+  await openHeaderMenu(page);
+  await expect(page.locator('#variantsPerPageSelect')).toHaveValue('auto');
+  await page.locator('#variantsSelect').fill('5');
+  await page.locator('#variantsPerPageSelect').selectOption('2');
+
+  const search = await page.evaluate(() => window.location.search);
+  expect(new URLSearchParams(search).get('vpp')).toBe('2');
+
+  await page.emulateMedia({ media: 'print' });
+  await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+
+  const pageGroups = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('.print-page-group')).map((group) =>
+      Array.from(group.children).filter((child) => child.classList.contains('variant-section')).length
+    )
+  );
+
+  expect(pageGroups).toEqual([2, 2, 1]);
+
+  await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+  await expect(page.locator('.print-page-group')).toHaveCount(0);
+});
+
 test('undo reverts a step activation with Ctrl+Z', async ({ page }) => {
   await gotoApp(page);
   await clearGrid(page);
