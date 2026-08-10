@@ -57,6 +57,21 @@
                         <label for="variantsSelect">Variants:</label>
                         <input type="number" id="variantsSelect" min="1" max="8" value="1">
                     </div>
+
+                    <div class="control-group">
+                        <label for="variantsPerPageSelect">Variants/Page:</label>
+                        <select id="variantsPerPageSelect">
+                            <option value="auto" selected>Auto</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8">8</option>
+                        </select>
+                    </div>
                      
                     <div class="control-group">
                         <label for="subdivisionSelect">Subdivision:</label>
@@ -142,6 +157,7 @@ https://harry947782.github.io/drukkit/index.html
 - time: Time signature token ("4/4", "3/4", "2/4", or "6/8").
 - bars: Int bar count string ("1" to "16").
 - sub: Resolution mode token ("quarter", "8th", "12th", or "16th").
+- vpp: Optional variants-per-print-page integer ("1" to "8"). Omit or set to auto behavior for adaptive pagination.
 - notes: URL-encoded copy of any practice logs, annotations, or side-remarks.
 - tracks: URL-encoded JSON structure array containing track objects.
 
