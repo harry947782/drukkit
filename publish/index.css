@@ -24,6 +24,12 @@
             --copy-btn-hover: #3b7cd1;
             --del-hover: #ff2e63;
             --menu-shadow: 0 20px 45px rgba(0, 0, 0, 0.28);
+            --track-label-width: 220px;
+            --print-track-label-width: 140px;
+            --layout-grid-gap: 4px;
+            --layout-bar-gap: 36px;
+            --layout-beat-gap: 20px;
+            --layout-symbol-scale: 65%;
             
             /* Vector Graphics Injection */
             --svg-circle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%23ffffff'/%3E%3C/svg%3E");
@@ -363,8 +369,9 @@
         .label-ctrls {
             display: flex;
             align-items: center;
-            width: 220px; 
+            width: var(--track-label-width);
             gap: 6px;
+            min-width: 0;
             flex-shrink: 0;
         }
 
@@ -390,6 +397,20 @@
             padding: 6px;
             border-radius: 4px;
             min-width: 0;
+        }
+
+        .instrument-label-print {
+            display: none;
+            flex: 1;
+            min-width: 0;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 13px;
+            letter-spacing: 1px;
+            color: var(--text-color);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .instrument-label-input:hover {
@@ -474,7 +495,7 @@
         .grid-steps {
             flex: 1;
             display: grid;
-            gap: 4px; 
+            gap: var(--layout-grid-gap);
             min-width: 0;
         }
 
@@ -615,7 +636,7 @@
             background-color: transparent !important;
             background-repeat: no-repeat;
             background-position: center;
-            background-size: 65%;
+            background-size: var(--layout-symbol-scale);
         }
 
         .track-row.sym-circle .step.active {
@@ -1038,7 +1059,6 @@
 
             /* FIXED UNIFORMITY: Freeze track name widths to ensure identical grid starts */
             .label-ctrls {
-                width: 140px !important;
                 flex-shrink: 0 !important;
                 display: flex !important;
             }
@@ -1055,12 +1075,12 @@
             }
 
             .instrument-label-input {
+                display: none !important;
+            }
+
+            .instrument-label-print {
+                display: block !important;
                 color: #000000 !important;
-                border: none !important;
-                background: transparent !important;
-                padding: 0 !important;
-                pointer-events: none !important;
-                width: 100% !important;
             }
 
             /* Maintain physical bounding frame symmetry for both empty and active grid elements */
@@ -1077,7 +1097,7 @@
                 border-color: #d0d0d0 !important;
                 background-repeat: no-repeat !important;
                 background-position: center !important;
-                background-size: 65% !important;
+                background-size: var(--layout-symbol-scale) !important;
             }
 
             /* Force crisp solid black presentation vector systems maximized for hardware printer runs */

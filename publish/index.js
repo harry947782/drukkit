@@ -33,6 +33,7 @@
         var barsSelect = document.getElementById('barsSelect');
         var variantsSelect = document.getElementById('variantsSelect');
         var subdivisionSelect = document.getElementById('subdivisionSelect');
+        var densitySelect = document.getElementById('densitySelect');
         var addTrackBtn = document.getElementById('addTrackBtn');
         var projectTitle = document.getElementById('projectTitle');
         var compositionNotes = document.getElementById('compositionNotes');
@@ -42,6 +43,7 @@
 
         var globalCachedGridTemplate = "";
         var globalCachedTotalSteps = 0;
+        var globalCachedLayoutMetrics = null;
         var beatSubOverrides = {};
         var dragSrcRow = null;
         var defaultProjectTitle = "My Drum Groove Composition";
@@ -59,6 +61,38 @@
 
         var liveVariantReps = [];
         var liveVariantNames = [];
+        var densityModes = {
+            comfortable: {
+                barGap: 36,
+                beatGap: 20,
+                gridGap: 4,
+                symbolScale: 65,
+                minBarGap: 24,
+                minBeatGap: 10,
+                minGridGap: 2,
+                maxTrackWidth: 340
+            },
+            compact: {
+                barGap: 30,
+                beatGap: 16,
+                gridGap: 3,
+                symbolScale: 70,
+                minBarGap: 18,
+                minBeatGap: 8,
+                minGridGap: 1.5,
+                maxTrackWidth: 320
+            },
+            dense: {
+                barGap: 24,
+                beatGap: 12,
+                gridGap: 2,
+                symbolScale: 74,
+                minBarGap: 14,
+                minBeatGap: 6,
+                minGridGap: 1,
+                maxTrackWidth: 300
+            }
+        };
 
         var textEncoder = new TextEncoder();
         var textDecoder = new TextDecoder();
@@ -93,6 +127,140 @@
             if (isNaN(val) || val < 1) return 1;
             if (val > 8) return 8;
             return val;
+        }
+
+        function clampNumber(value, min, max) {
+            return Math.min(Math.max(value, min), max);
+        }
+
+        function lerp(start, end, progress) {
+            return start + ((end - start) * progress);
+        }
+
+        function formatPx(value) {
+            return (Math.round(value * 10) / 10) + 'px';
+        }
+
+        function getDensityValue() {
+            var value = densitySelect && densityModes[densitySelect.value] ? densitySelect.value : 'comfortable';
+            if (densitySelect && densitySelect.value !== value) densitySelect.value = value;
+            return value;
+        }
+
+        function measureLabelTextWidth(text) {
+            var probe = document.createElement('span');
+            probe.style.position = 'absolute';
+            probe.style.visibility = 'hidden';
+            probe.style.whiteSpace = 'pre';
+            probe.style.pointerEvents = 'none';
+            probe.style.fontFamily = 'sans-serif';
+            probe.style.fontWeight = 'bold';
+            probe.style.fontSize = '13px';
+            probe.style.letterSpacing = '1px';
+            probe.style.textTransform = 'uppercase';
+            probe.textContent = text || '';
+            document.body.appendChild(probe);
+            var width = probe.getBoundingClientRect().width;
+            probe.remove();
+            return width;
+        }
+
+        function getLongestTrackLabelWidth() {
+            var widest = measureLabelTextWidth('Track');
+            for (var i = 0; i < liveInstrumentsMemory.length; i++) {
+                widest = Math.max(widest, measureLabelTextWidth(liveInstrumentsMemory[i].defaultName || ''));
+            }
+            return widest;
+        }
+
+        function deriveCurrentLayoutContext() {
+            var sig = timeSigSelect.value;
+            var subVal = subdivisionSelect.value;
+            var totalBars = getSanitizedBarsCount();
+            var totalVariants = getSanitizedVariantsCount();
+            var currentSigConfig = timeSigConfig[sig];
+            var beatsPerBar = currentSigConfig.beats;
+            var currentSub = null;
+
+            for (var s = 0; s < currentSigConfig.subs.length; s++) {
+                if (currentSigConfig.subs[s].v === subVal) {
+                    currentSub = currentSigConfig.subs[s];
+                }
+            }
+            if (!currentSub) currentSub = currentSigConfig.subs[0];
+
+            var multiplier = currentSub.m;
+            var beatMultipliers = computeBeatMultipliersArray(beatsPerBar, multiplier);
+            var stepsPerBar = computeStepsPerBarFromArray(beatMultipliers);
+
+            return {
+                sig: sig,
+                subVal: subVal,
+                totalBars: totalBars,
+                totalVariants: totalVariants,
+                beatsPerBar: beatsPerBar,
+                multiplier: multiplier,
+                beatMultipliers: beatMultipliers,
+                stepsPerBar: stepsPerBar,
+                totalSteps: stepsPerBar * totalBars
+            };
+        }
+
+        function computeSharedLayoutSizing(layoutContext) {
+            var densityValue = getDensityValue();
+            var densityConfig = densityModes[densityValue] || densityModes.comfortable;
+            var compression = clampNumber(Math.max(
+                (layoutContext.totalSteps - 16) / 48,
+                (layoutContext.totalBars - 2) / 10
+            ), 0, 1);
+            var longestLabelWidth = getLongestTrackLabelWidth();
+            var screenControlsWidth = 112;
+            var labelPaddingWidth = 18;
+            var printPaddingWidth = 8;
+
+            return {
+                density: densityValue,
+                barGap: lerp(densityConfig.barGap, densityConfig.minBarGap, compression),
+                beatGap: lerp(densityConfig.beatGap, densityConfig.minBeatGap, compression),
+                gridGap: lerp(densityConfig.gridGap, densityConfig.minGridGap, compression),
+                symbolScale: Math.round(lerp(densityConfig.symbolScale, densityConfig.symbolScale + 8, compression) * 10) / 10,
+                trackLabelWidth: clampNumber(longestLabelWidth + screenControlsWidth + labelPaddingWidth, 150, densityConfig.maxTrackWidth),
+                printTrackLabelWidth: clampNumber(longestLabelWidth + printPaddingWidth, 88, 220)
+            };
+        }
+
+        function applySharedLayoutSizing(layoutMetrics) {
+            document.documentElement.style.setProperty('--track-label-width', formatPx(layoutMetrics.trackLabelWidth));
+            document.documentElement.style.setProperty('--print-track-label-width', formatPx(layoutMetrics.printTrackLabelWidth));
+            document.documentElement.style.setProperty('--layout-grid-gap', formatPx(layoutMetrics.gridGap));
+            document.documentElement.style.setProperty('--layout-bar-gap', formatPx(layoutMetrics.barGap));
+            document.documentElement.style.setProperty('--layout-beat-gap', formatPx(layoutMetrics.beatGap));
+            document.documentElement.style.setProperty('--layout-symbol-scale', layoutMetrics.symbolScale + '%');
+        }
+
+        function applyLabelColumnWidth(widthValue) {
+            var widthPx = formatPx(widthValue);
+            var labelColumns = document.querySelectorAll('.label-ctrls');
+            for (var i = 0; i < labelColumns.length; i++) {
+                labelColumns[i].style.width = widthPx;
+                labelColumns[i].style.minWidth = widthPx;
+                labelColumns[i].style.maxWidth = widthPx;
+            }
+        }
+
+        function refreshLayoutSizing() {
+            globalCachedLayoutMetrics = computeSharedLayoutSizing(deriveCurrentLayoutContext());
+            applySharedLayoutSizing(globalCachedLayoutMetrics);
+            if (document.querySelector('.label-ctrls')) {
+                var isPrintMedia = window.matchMedia && window.matchMedia('print').matches;
+                applyLabelColumnWidth(isPrintMedia ? globalCachedLayoutMetrics.printTrackLabelWidth : globalCachedLayoutMetrics.trackLabelWidth);
+            }
+            updatePrintLayoutPreference();
+        }
+
+        function syncTrackInputSizing(inputEl, value) {
+            if (!inputEl) return;
+            inputEl.size = Math.max((value || '').length, 1);
         }
 
         function getEffectiveBeatMultiplier(beatIndex, globalMultiplier) {
@@ -168,6 +336,7 @@
                 bars: barsSelect.value,
                 variants: variantsSelect.value,
                 sub: subdivisionSelect.value,
+                density: getDensityValue(),
                 beatSubOverrides: JSON.parse(JSON.stringify(beatSubOverrides)),
                 notes: compositionNotes.value,
                 instruments: liveInstrumentsMemory.map(function(inst) {
@@ -212,6 +381,7 @@
             timeSigSelect.value = snapshot.time;
             barsSelect.value = snapshot.bars;
             variantsSelect.value = snapshot.variants;
+            if (densitySelect) densitySelect.value = densityModes[snapshot.density] ? snapshot.density : 'comfortable';
 
             var options = timeSigConfig[snapshot.time].subs;
             subdivisionSelect.innerHTML = '';
@@ -441,7 +611,7 @@
 
         // Compression/decompression functions for QR code URL optimization
         var MAX_URL_LENGTH = 2000;
-        function compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, repsData, variantNamesArr) {
+        function compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, repsData, variantNamesArr, densityVal) {
             // Bit layout (16-bit value):
             //   Bit 15: hasVariantNames flag
             //   Bit 14: hasReps flag
@@ -561,6 +731,9 @@
                 }
             }
             
+            var densityIndexMap = {comfortable: 0, compact: 1, dense: 2};
+            data.push(densityIndexMap[densityVal] !== undefined ? densityIndexMap[densityVal] : 0);
+
             // Convert data array to binary string and encode as base64
             var binaryString = '';
             for (var i = 0; i < data.length; i++) {
@@ -594,6 +767,8 @@
                 var subVal = subReverseMap[subBits];
                 var titleVal = defaultProjectTitle;
                 var notesVal = '';
+                var densityReverseMap = {0: 'comfortable', 1: 'compact', 2: 'dense'};
+                var densityVal = 'comfortable';
                 
                 // Decode title if present (now using 2-byte length field)
                 if (hasTitle) {
@@ -677,11 +852,16 @@
                         decompVariantNames.push(textDecoder.decode(new Uint8Array(nameBytes)));
                     }
                 }
+
+                if (idx < allData.length) {
+                    densityVal = densityReverseMap[allData.charCodeAt(idx++)] || 'comfortable';
+                }
                 
                 return {
                     time: timeVal,
                     bars: barsVal,
                     sub: subVal,
+                    density: densityVal,
                     title: titleVal,
                     notes: notesVal,
                     tracks: decompTracks,
@@ -707,6 +887,7 @@
             var barsVal = barsSelect.value;
             var variantCount = getSanitizedVariantsCount();
             var subVal = subdivisionSelect.value;
+            var densityVal = getDensityValue();
             var notesVal = compositionNotes.value;
             
             var savedVariants = normalizeVariantNotesList(extractAllVariantNotes(), variantCount);
@@ -719,6 +900,7 @@
             params.set('time', timeVal);
             params.set('bars', barsVal);
             params.set('sub', subVal);
+            if (densityVal !== 'comfortable') params.set('density', densityVal);
             params.set('notes', notesVal);
             params.set('tracks', JSON.stringify(tracksPayload));
             if (variantCount > 1) {
@@ -751,7 +933,7 @@
             // The compressed value is also reused for the QR code below to avoid compressing twice.
             var compressed = null;
             if (!hasBeatSubOverrides && newUrl.length > MAX_URL_LENGTH) {
-                compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, liveVariantReps, liveVariantNames);
+                compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, liveVariantReps, liveVariantNames, densityVal);
                 var compressedParams = new URLSearchParams();
                 compressedParams.set('c', compressed);
                 newUrl = buildBaseUrl() + '?' + compressedParams.toString();
@@ -773,7 +955,7 @@
                     }
                 } else {
                     if (!compressed) {
-                        compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, liveVariantReps, liveVariantNames);
+                        compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, liveVariantReps, liveVariantNames, densityVal);
                     }
                     var qrParams = new URLSearchParams();
                     qrParams.set('c', compressed);
@@ -1488,18 +1670,31 @@
             input.type = 'text';
             input.classList.add('instrument-label-input');
             input.value = inst.defaultName;
+            syncTrackInputSizing(input, inst.defaultName);
+
+            var printLabel = document.createElement('span');
+            printLabel.classList.add('instrument-label-print');
+            printLabel.textContent = inst.defaultName;
             input.oninput = function() {
                 pushUndoSnapshot();
                 inst.defaultName = this.value;
+                syncTrackInputSizing(this, inst.defaultName);
                 var peerInputs = document.querySelectorAll('.track-row[data-instrument="' + inst.id + '"] .instrument-label-input');
+                var peerPrintLabels = document.querySelectorAll('.track-row[data-instrument="' + inst.id + '"] .instrument-label-print');
                 for (var p = 0; p < peerInputs.length; p++) {
                     if (peerInputs[p] !== this) {
                         peerInputs[p].value = inst.defaultName;
+                        syncTrackInputSizing(peerInputs[p], inst.defaultName);
                     }
                 }
+                for (var q = 0; q < peerPrintLabels.length; q++) {
+                    peerPrintLabels[q].textContent = inst.defaultName;
+                }
+                refreshLayoutSizing();
                 updateURL();
             };
             labelCtrls.appendChild(input);
+            labelCtrls.appendChild(printLabel);
 
             var delBtn = document.createElement('button');
             delBtn.classList.add('delete-track-btn');
@@ -1655,55 +1850,39 @@
 
         function buildNotationGrid() {
             gridContainer.innerHTML = '';
-
-            var sig = timeSigSelect.value;
-            var subVal = subdivisionSelect.value;
-            var totalBars = getSanitizedBarsCount();
-            var totalVariants = getSanitizedVariantsCount();
-            var currentSigConfig = timeSigConfig[sig];
-            
-            var beatsPerBar = currentSigConfig.beats;
-            var currentSub = null;
-            for (var s = 0; s < currentSigConfig.subs.length; s++) {
-                if (currentSigConfig.subs[s].v === subVal) {
-                    currentSub = currentSigConfig.subs[s];
-                }
-            }
-            if (!currentSub) currentSub = currentSigConfig.subs[0];
-
-            var multiplier = currentSub.m;
-            var beatMultipliers = computeBeatMultipliersArray(beatsPerBar, multiplier);
-            var stepsPerBar = computeStepsPerBarFromArray(beatMultipliers);
-            globalCachedTotalSteps = stepsPerBar * totalBars; 
+            var layoutContext = deriveCurrentLayoutContext();
+            globalCachedTotalSteps = layoutContext.totalSteps;
+            globalCachedLayoutMetrics = computeSharedLayoutSizing(layoutContext);
+            applySharedLayoutSizing(globalCachedLayoutMetrics);
 
             var trackColumnsTemplate = [];
-            trackColumnsTemplate.push('36px'); 
+            trackColumnsTemplate.push('var(--layout-bar-gap)'); 
             
-            for (var b = 0; b < totalBars; b++) {
-                if (b > 0) trackColumnsTemplate.push('36px');
-                for (var bt = 0; bt < beatsPerBar; bt++) {
-                    if (bt > 0) trackColumnsTemplate.push('20px');
-                    for (var s = 0; s < beatMultipliers[bt]; s++) {
+            for (var b = 0; b < layoutContext.totalBars; b++) {
+                if (b > 0) trackColumnsTemplate.push('var(--layout-bar-gap)');
+                for (var bt = 0; bt < layoutContext.beatsPerBar; bt++) {
+                    if (bt > 0) trackColumnsTemplate.push('var(--layout-beat-gap)');
+                    for (var s = 0; s < layoutContext.beatMultipliers[bt]; s++) {
                         trackColumnsTemplate.push('minmax(0, 1fr)');
                     }
                 }
             }
             
-            trackColumnsTemplate.push('36px'); 
+            trackColumnsTemplate.push('var(--layout-bar-gap)'); 
             globalCachedGridTemplate = trackColumnsTemplate.join(' ');
 
-            buildGridHeaderElement(totalBars, beatsPerBar, beatMultipliers, globalCachedGridTemplate, sig);
+            buildGridHeaderElement(layoutContext.totalBars, layoutContext.beatsPerBar, layoutContext.beatMultipliers, globalCachedGridTemplate, layoutContext.sig);
 
-            var barWidth = beatsPerBar * (multiplier + 1) - 1;
-            for (var variantIndex = 0; variantIndex < totalVariants; variantIndex++) {
+            var barWidth = layoutContext.beatsPerBar * (layoutContext.multiplier + 1) - 1;
+            for (var variantIndex = 0; variantIndex < layoutContext.totalVariants; variantIndex++) {
                 var variantSection = createVariantSection(variantIndex);
-                variantSection.appendChild(buildRepsRowElement(variantIndex, totalBars, barWidth, globalCachedGridTemplate));
+                variantSection.appendChild(buildRepsRowElement(variantIndex, layoutContext.totalBars, barWidth, globalCachedGridTemplate));
                 for (var idx = 0; idx < liveInstrumentsMemory.length; idx++) {
                     appendSingleRowElement(
                         liveInstrumentsMemory[idx],
-                        totalBars,
-                        beatsPerBar,
-                        beatMultipliers,
+                        layoutContext.totalBars,
+                        layoutContext.beatsPerBar,
+                        layoutContext.beatMultipliers,
                         globalCachedGridTemplate,
                         variantIndex,
                         variantSection
@@ -1711,8 +1890,9 @@
                 }
             }
 
+            applyLabelColumnWidth((window.matchMedia && window.matchMedia('print').matches) ? globalCachedLayoutMetrics.printTrackLabelWidth : globalCachedLayoutMetrics.trackLabelWidth);
             updatePrintLayoutPreference();
-            return { sig: sig, multiplier: multiplier, beatMultipliers: beatMultipliers, stepsPerBar: stepsPerBar, totalBars: totalBars };
+            return { sig: layoutContext.sig, multiplier: layoutContext.multiplier, beatMultipliers: layoutContext.beatMultipliers, stepsPerBar: layoutContext.stepsPerBar, totalBars: layoutContext.totalBars };
         }
 
         function applyContextualRhythm(layoutInfo) {
@@ -1791,6 +1971,22 @@
             document.body.classList.add(shouldUsePortrait ? 'print-portrait' : 'print-landscape');
         }
 
+        function preparePrintLayout() {
+            refreshLayoutSizing();
+            if (globalCachedLayoutMetrics) {
+                applyLabelColumnWidth(globalCachedLayoutMetrics.printTrackLabelWidth);
+            }
+            updatePrintLayoutPreference();
+        }
+
+        function restoreScreenLayout() {
+            refreshLayoutSizing();
+            if (globalCachedLayoutMetrics) {
+                applyLabelColumnWidth(globalCachedLayoutMetrics.trackLabelWidth);
+            }
+            updatePrintLayoutPreference();
+        }
+
         function handleConfigurationLifecycle(loadDefaultRhythm) {
             var savedVariants = null;
             if (!loadDefaultRhythm) {
@@ -1823,6 +2019,7 @@
                     document.title = decompressed.title || defaultProjectTitle;
                     timeSigSelect.value = decompressed.time;
                     barsSelect.value = decompressed.bars;
+                    if (densitySelect) densitySelect.value = densityModes[decompressed.density] ? decompressed.density : 'comfortable';
                     compositionNotes.value = decompressed.notes || "";
                     variantsSelect.value = (decompressed.variants && decompressed.variants.length) || defaultVariantCount;
                     
@@ -1884,12 +2081,14 @@
                 var timeVal = params.get('time') || "4/4";
                 var barsVal = params.get('bars') || "2";
                 var subVal = params.get('sub') || "16th";
+                var densityVal = params.get('density') || 'comfortable';
                 var notesVal = params.get('notes') || "";
                 
                 projectTitle.value = titleVal;
                 document.title = titleVal;
                 timeSigSelect.value = timeVal;
                 barsSelect.value = barsVal;
+                if (densitySelect) densitySelect.value = densityModes[densityVal] ? densityVal : 'comfortable';
                 compositionNotes.value = notesVal;
                 
                 var options = timeSigConfig[timeVal].subs;
@@ -1971,6 +2170,7 @@
                 document.title = projectTitle.value;
                 compositionNotes.value = "";
                 variantsSelect.value = defaultVariantCount;
+                if (densitySelect) densitySelect.value = 'comfortable';
                 liveVariantReps = [];
                 liveVariantNames = [];
                 updateSubdivisionDropdown();
@@ -2004,6 +2204,7 @@
                 var barsVal = barsSelect.value;
                 var variantCount = getSanitizedVariantsCount();
                 var subVal = subdivisionSelect.value;
+                var densityVal = getDensityValue();
                 var notesVal = compositionNotes.value;
                 var savedVariants = normalizeVariantNotesList(extractAllVariantNotes(), variantCount);
                 var tracksPayload = buildTracksPayload(savedVariants[0] || {});
@@ -2019,6 +2220,7 @@
                         time: timeVal,
                         bars: barsVal,
                         sub: subVal,
+                        density: densityVal,
                         notes: notesVal,
                         tracks: tracksPayload,
                         variants: variantCount > 1 ? variantsPayload : null,
@@ -2050,6 +2252,7 @@
                 time: timeSigSelect.value,
                 bars: barsSelect.value,
                 sub: subdivisionSelect.value,
+                density: getDensityValue(),
                 notes: compositionNotes.value,
                 tracks: tracksPayload,
                 variants: variantCount > 1 ? variantsPayload : null,
@@ -2084,6 +2287,7 @@
                 timeSigSelect.value = state.time;
                 barsSelect.value = state.bars;
                 subdivisionSelect.value = state.sub;
+                if (densitySelect) densitySelect.value = densityModes[state.density] ? state.density : 'comfortable';
                 compositionNotes.value = state.notes;
 
                 updateSubdivisionDropdown();
@@ -2307,6 +2511,12 @@
             updateURL();
         };
 
+        densitySelect.onchange = function() {
+            pushUndoSnapshot();
+            handleConfigurationLifecycle(false);
+            updateURL();
+        };
+
         addTrackBtn.onclick = function() {
             pushUndoSnapshot();
             var sig = timeSigSelect.value;
@@ -2440,8 +2650,8 @@
             }
         });
 
-        window.addEventListener('beforeprint', updatePrintLayoutPreference);
-        window.addEventListener('afterprint', updatePrintLayoutPreference);
+        window.addEventListener('beforeprint', preparePrintLayout);
+        window.addEventListener('afterprint', restoreScreenLayout);
 
         // Initialize App Runtime
         initFromURLOrDefaults();
