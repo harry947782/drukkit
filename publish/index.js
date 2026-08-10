@@ -11,7 +11,9 @@
             { v: 'open-circle', label: '○', title: 'Open Circle' },
             { v: 'slash',       label: '/',  title: 'Forward Slash' },
             { v: 'backslash',   label: '\\', title: 'Backslash' },
-            { v: 'plus',        label: '+',  title: 'Plus' }
+            { v: 'plus',        label: '+',  title: 'Plus' },
+            { v: 'multi-circle', label: '◍', title: 'Multi-state: Filled Circle → Open Circle → Cross' },
+            { v: 'multi-cross',  label: '✣', title: 'Multi-state: Cross → Right Diagonal → Left Diagonal' }
         ];
 
         function findSymIndex(symbol) {

@@ -58,6 +58,21 @@ async function stepClasses(page, trackId, stepIndex, variantIndex = 0) {
   }));
 }
 
+async function stepBackgroundImage(page, trackId, stepIndex, variantIndex = 0) {
+  return page.locator(stepSelector(trackId, stepIndex, variantIndex)).evaluate((step) => getComputedStyle(step).backgroundImage);
+}
+
+async function setTrackSymbol(page, trackId, symbol, variantIndex = 0) {
+  const row = page.locator(trackSelector(trackId, variantIndex));
+  const button = row.locator('.symbol-cycle-btn');
+  for (let i = 0; i < 8; i++) {
+    const matches = await row.evaluate((el, expected) => el.classList.contains(`sym-${expected}`), symbol);
+    if (matches) return;
+    await button.click();
+  }
+  throw new Error(`Unable to set ${trackId} to symbol ${symbol}`);
+}
+
 async function activeSteps(page, trackId, variantIndex = 0) {
   return page.evaluate(({ id, variant }) => {
     return Array.from(document.querySelectorAll(`.track-row[data-variant="${variant}"][data-instrument="${id}"] .step`))
@@ -153,6 +168,46 @@ test('cycles note states and toggles accents without losing hand annotations', a
 
   await clickStep(page, 'hihat', 1);
   expect(await stepClasses(page, 'hihat', 1)).toEqual({ active: false, right: false, left: false, accent: false });
+});
+
+test('renders multi-state symbols as three glyph states instead of R/L letters', async ({ page }) => {
+  await gotoApp(page);
+  await clearGrid(page);
+
+  await clickStep(page, 'snare', 0);
+  await clickStep(page, 'snare', 0);
+  const defaultRightImage = await stepBackgroundImage(page, 'snare', 0);
+
+  await clickStep(page, 'bass', 0);
+  await clickStep(page, 'bass', 0);
+  await clickStep(page, 'bass', 0);
+  const defaultLeftImage = await stepBackgroundImage(page, 'bass', 0);
+
+  await setTrackSymbol(page, 'hihat', 'multi-circle');
+  await clickStep(page, 'hihat', 1);
+  const circleActiveImage = await stepBackgroundImage(page, 'hihat', 1);
+  await clickStep(page, 'hihat', 1);
+  const circleRightImage = await stepBackgroundImage(page, 'hihat', 1);
+  await clickStep(page, 'hihat', 1);
+  const circleLeftImage = await stepBackgroundImage(page, 'hihat', 1);
+
+  expect(circleRightImage).not.toBe(defaultRightImage);
+  expect(circleLeftImage).not.toBe(defaultLeftImage);
+  expect(circleActiveImage).not.toBe(circleRightImage);
+  expect(circleRightImage).not.toBe(circleLeftImage);
+
+  await setTrackSymbol(page, 'hihat', 'multi-cross');
+  await clickStep(page, 'hihat', 2);
+  const crossActiveImage = await stepBackgroundImage(page, 'hihat', 2);
+  await clickStep(page, 'hihat', 2);
+  const crossRightImage = await stepBackgroundImage(page, 'hihat', 2);
+  await clickStep(page, 'hihat', 2);
+  const crossLeftImage = await stepBackgroundImage(page, 'hihat', 2);
+
+  expect(crossRightImage).not.toBe(defaultRightImage);
+  expect(crossLeftImage).not.toBe(defaultLeftImage);
+  expect(crossActiveImage).not.toBe(crossRightImage);
+  expect(crossRightImage).not.toBe(crossLeftImage);
 });
 
 test('serializes custom edits into the URL and restores them on reload', async ({ page }) => {
