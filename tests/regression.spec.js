@@ -563,6 +563,40 @@ test('uses print-safe variant sections and portrait mode for narrow stacked layo
   expect(printStyles.pageBreakInside).toContain('avoid');
 });
 
+test('balances print variant counts across grouped pages when variants span multiple pages', async ({ page }) => {
+  await gotoApp(page);
+  await openHeaderMenu(page);
+  await page.locator('#variantsSelect').fill('5');
+  await page.evaluate(() => {
+    for (var i = 0; i < 10; i++) {
+      document.getElementById('addTrackBtn').click();
+    }
+  });
+
+  await page.emulateMedia({ media: 'print' });
+  await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+
+  const pageGroups = await page.evaluate(() => {
+    return Array.from(document.querySelectorAll('.print-page-group')).map((group) => {
+      const variants = Array.from(group.children)
+        .filter((child) => child.classList.contains('variant-section'))
+        .map((child) => parseInt(child.getAttribute('data-variant'), 10));
+      return {
+        count: variants.length,
+        variants
+      };
+    });
+  });
+
+  expect(pageGroups.length).toBeGreaterThan(1);
+  expect(pageGroups.reduce((total, group) => total + group.count, 0)).toBe(5);
+  expect(Math.max(...pageGroups.map((group) => group.count)) - Math.min(...pageGroups.map((group) => group.count))).toBeLessThanOrEqual(1);
+  expect(pageGroups.flatMap((group) => group.variants)).toEqual([0, 1, 2, 3, 4]);
+
+  await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+  await expect(page.locator('.print-page-group')).toHaveCount(0);
+});
+
 test('undo reverts a step activation with Ctrl+Z', async ({ page }) => {
   await gotoApp(page);
   await clearGrid(page);

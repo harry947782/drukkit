@@ -331,6 +331,169 @@
             return remapped;
         }
 
+        function getDirectVariantSections() {
+            var allSections = gridContainer.querySelectorAll('.variant-section');
+            var directSections = [];
+            for (var i = 0; i < allSections.length; i++) {
+                if (
+                    allSections[i].parentNode === gridContainer ||
+                    (allSections[i].parentNode && allSections[i].parentNode.classList.contains('print-page-group'))
+                ) {
+                    directSections.push(allSections[i]);
+                }
+            }
+            return directSections;
+        }
+
+        function unwrapPrintPageGroups() {
+            var pageGroups = gridContainer.querySelectorAll('.print-page-group');
+            if (!pageGroups.length) return;
+
+            var variantSections = [];
+            for (var i = 0; i < pageGroups.length; i++) {
+                while (pageGroups[i].firstChild) {
+                    var variantNode = pageGroups[i].firstChild;
+                    pageGroups[i].removeChild(variantNode);
+                    variantSections.push(variantNode);
+                }
+            }
+
+            for (var g = 0; g < pageGroups.length; g++) {
+                if (pageGroups[g].parentNode) {
+                    pageGroups[g].parentNode.removeChild(pageGroups[g]);
+                }
+            }
+
+            var headerRow = gridContainer.querySelector('.track-row.header-row');
+            var insertAfter = headerRow;
+            for (var v = 0; v < variantSections.length; v++) {
+                if (insertAfter && insertAfter.nextSibling) {
+                    gridContainer.insertBefore(variantSections[v], insertAfter.nextSibling);
+                } else {
+                    gridContainer.appendChild(variantSections[v]);
+                }
+                insertAfter = variantSections[v];
+            }
+        }
+
+        function getPrintPageHeightEstimate() {
+            var inchProbe = document.createElement('div');
+            inchProbe.style.position = 'absolute';
+            inchProbe.style.visibility = 'hidden';
+            inchProbe.style.pointerEvents = 'none';
+            inchProbe.style.width = '1in';
+            inchProbe.style.height = '1in';
+            document.body.appendChild(inchProbe);
+            var pxPerInch = inchProbe.getBoundingClientRect().height || 96;
+            document.body.removeChild(inchProbe);
+
+            var isPortrait = document.body.classList.contains('print-portrait');
+            var pageHeightPx = pxPerInch * (isPortrait ? 11 : 8.5);
+            var headerEl = document.querySelector('header');
+            var notationEl = document.querySelector('.notation-container');
+            var headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 0;
+            var notationStyles = notationEl ? window.getComputedStyle(notationEl) : null;
+            var notationPaddingTop = notationStyles ? parseFloat(notationStyles.paddingTop) || 0 : 0;
+            var notationPaddingBottom = notationStyles ? parseFloat(notationStyles.paddingBottom) || 0 : 0;
+            var bodyPaddingAllowance = pxPerInch * 0.8;
+            var safetyBuffer = 24;
+            var gridGap = parseFloat(window.getComputedStyle(gridContainer).gap) || 0;
+
+            return {
+                firstPage: Math.max(pageHeightPx - headerHeight - notationPaddingTop - bodyPaddingAllowance - safetyBuffer - gridGap, 120),
+                followingPages: Math.max(pageHeightPx - notationPaddingTop - notationPaddingBottom - bodyPaddingAllowance - safetyBuffer, 120)
+            };
+        }
+
+        function buildBalancedPageCounts(totalVariants, pageCount) {
+            var counts = [];
+            if (totalVariants <= 0 || pageCount <= 0) return counts;
+            var baseCount = Math.floor(totalVariants / pageCount);
+            var remainder = totalVariants % pageCount;
+            for (var i = 0; i < pageCount; i++) {
+                counts.push(baseCount + (i < remainder ? 1 : 0));
+            }
+            return counts;
+        }
+
+        function measureVariantGroupHeight(variantHeights, startIndex, count, groupGap) {
+            if (count <= 0) return 0;
+            var total = 0;
+            for (var i = 0; i < count; i++) {
+                total += variantHeights[startIndex + i] || 0;
+            }
+            total += groupGap * Math.max(count - 1, 0);
+            return total;
+        }
+
+        function rebalancePrintVariantPages() {
+            unwrapPrintPageGroups();
+
+            var variantSections = getDirectVariantSections();
+            if (variantSections.length < 2) return;
+
+            var pageHeights = getPrintPageHeightEstimate();
+            var groupGap = parseFloat(window.getComputedStyle(gridContainer).gap) || 0;
+            var variantHeights = [];
+            for (var i = 0; i < variantSections.length; i++) {
+                variantHeights.push(variantSections[i].getBoundingClientRect().height);
+            }
+
+            var requiredPageCount = 1;
+            var remainingHeight = pageHeights.firstPage;
+            var currentLimit = pageHeights.firstPage;
+            for (var v = 0; v < variantHeights.length; v++) {
+                var variantHeight = variantHeights[v];
+                var neededHeight = variantHeight + ((remainingHeight === currentLimit) ? 0 : groupGap);
+                if (neededHeight <= remainingHeight || variantHeight > currentLimit) {
+                    remainingHeight -= neededHeight;
+                } else {
+                    requiredPageCount++;
+                    currentLimit = pageHeights.followingPages;
+                    remainingHeight = currentLimit - variantHeight;
+                }
+            }
+
+            if (requiredPageCount <= 1) return;
+
+            var pageCounts = buildBalancedPageCounts(variantSections.length, requiredPageCount);
+            var pageStart = 0;
+            for (var pageIndex = 0; pageIndex < pageCounts.length; pageIndex++) {
+                var pageLimit = pageIndex === 0 ? pageHeights.firstPage : pageHeights.followingPages;
+                while (
+                    pageCounts[pageIndex] > 1 &&
+                    measureVariantGroupHeight(variantHeights, pageStart, pageCounts[pageIndex], groupGap) > pageLimit
+                ) {
+                    pageCounts[pageIndex]--;
+                    if (pageIndex + 1 >= pageCounts.length) {
+                        pageCounts.push(0);
+                    }
+                    pageCounts[pageIndex + 1]++;
+                }
+                pageStart += pageCounts[pageIndex];
+            }
+
+            var headerRow = gridContainer.querySelector('.track-row.header-row');
+            var fragment = document.createDocumentFragment();
+            var variantCursor = 0;
+            for (var p = 0; p < pageCounts.length; p++) {
+                if (!pageCounts[p]) continue;
+                var pageGroup = document.createElement('div');
+                pageGroup.classList.add('print-page-group');
+                pageGroup.setAttribute('data-print-page', p);
+                for (var c = 0; c < pageCounts[p] && variantCursor < variantSections.length; c++) {
+                    pageGroup.appendChild(variantSections[variantCursor++]);
+                }
+                fragment.appendChild(pageGroup);
+            }
+
+            if (headerRow && headerRow.nextSibling) {
+                gridContainer.insertBefore(fragment, headerRow.nextSibling);
+            } else {
+                gridContainer.appendChild(fragment);
+            }
+        }
+
         function captureSnapshot() {
             return {
                 title: projectTitle.value,
@@ -1979,9 +2142,11 @@
                 applyLabelColumnWidth(globalCachedLayoutMetrics.printTrackLabelWidth);
             }
             updatePrintLayoutPreference();
+            rebalancePrintVariantPages();
         }
 
         function restoreScreenLayout() {
+            unwrapPrintPageGroups();
             refreshLayoutSizing();
             if (globalCachedLayoutMetrics) {
                 applyLabelColumnWidth(globalCachedLayoutMetrics.trackLabelWidth);
