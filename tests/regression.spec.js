@@ -673,6 +673,8 @@ test('uses content-driven track widths on screen and print', async ({ page }) =>
   expect(widths.print).toBeLessThan(widths.screen);
 
   await page.emulateMedia({ media: 'print' });
+  // emulateMedia does not fire beforeprint; dispatch it explicitly so preparePrintLayout runs.
+  await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
 
   const alignment = await page.evaluate(() => {
     const headerGrid = document.querySelector('.track-row.header-row .grid-steps').getBoundingClientRect();

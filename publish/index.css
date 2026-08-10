@@ -1059,7 +1059,6 @@
 
             /* FIXED UNIFORMITY: Freeze track name widths to ensure identical grid starts */
             .label-ctrls {
-                width: var(--print-track-label-width) !important;
                 flex-shrink: 0 !important;
                 display: flex !important;
             }
