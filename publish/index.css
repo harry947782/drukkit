@@ -311,6 +311,10 @@
             gap: 48px; 
         }
 
+        .print-page-group {
+            display: contents;
+        }
+
         .variant-section {
             display: flex;
             flex-direction: column;
@@ -1040,6 +1044,21 @@
 
             .notation-grid-wrapper {
                 gap: 36px !important; 
+            }
+
+            .print-page-group {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 36px !important;
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+                break-after: page !important;
+                page-break-after: always !important;
+            }
+
+            .print-page-group:last-child {
+                break-after: auto !important;
+                page-break-after: auto !important;
             }
 
             .variant-section {
