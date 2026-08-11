@@ -1056,6 +1056,25 @@
                 height: 100% !important;
             }
 
+            /* Dense mode: suppress QR code and collapse header to logo/title only */
+            html.density-dense .print-qr-container {
+                display: none !important;
+            }
+
+            html.density-dense header {
+                padding: 4px 0 !important;
+                gap: 8px !important;
+            }
+
+            html.density-dense .logo-container svg {
+                height: 22px !important;
+            }
+
+            html.density-dense #projectTitle {
+                font-size: 1rem !important;
+                padding: 0 !important;
+            }
+
             .notation-container {
                 padding: 20px 0 !important;
                 height: auto !important;
