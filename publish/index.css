@@ -998,6 +998,12 @@
                 padding: 1cm !important; /* Adds page safety buffer margin entirely inside document canvas */
             }
 
+            /* When page groups carry their own header clone, suppress the original so it
+               doesn't double-up on the first page. */
+            body.has-print-pages > header {
+                display: none !important;
+            }
+
             header {
                 background-color: #ffffff !important;
                 border-bottom: 2px solid #000000 !important;
@@ -1005,6 +1011,11 @@
                 display: flex !important;
                 align-items: center !important;
                 justify-content: space-between !important;
+            }
+
+            /* Cloned header injected into every page group */
+            .print-header-clone {
+                margin-bottom: 0 !important;
             }
 
             .logo-container {
