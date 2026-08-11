@@ -370,19 +370,15 @@
         }
 
         function unwrapPrintPageGroups() {
-            document.body.classList.remove('has-print-pages');
             var pageGroups = gridContainer.querySelectorAll('.print-page-group');
             if (!pageGroups.length) return;
 
             var variantSections = [];
             for (var i = 0; i < pageGroups.length; i++) {
-                var clones = pageGroups[i].querySelectorAll('.print-header-clone');
-                for (var j = 0; j < clones.length; j++) {
-                    clones[j].parentNode.removeChild(clones[j]);
-                }
-                while (pageGroups[i].firstChild) {
-                    var variantNode = pageGroups[i].firstChild;
-                    pageGroups[i].removeChild(variantNode);
+                var pageContent = pageGroups[i].querySelector('.print-page-content') || pageGroups[i];
+                while (pageContent.firstChild) {
+                    var variantNode = pageContent.firstChild;
+                    pageContent.removeChild(variantNode);
                     variantSections.push(variantNode);
                 }
             }
@@ -405,6 +401,20 @@
             }
         }
 
+        function measureCssLength(lengthValue) {
+            if (!lengthValue) return 0;
+            var probe = document.createElement('div');
+            probe.style.position = 'absolute';
+            probe.style.visibility = 'hidden';
+            probe.style.pointerEvents = 'none';
+            probe.style.height = lengthValue;
+            probe.style.width = '0';
+            document.body.appendChild(probe);
+            var measured = probe.getBoundingClientRect().height || 0;
+            document.body.removeChild(probe);
+            return measured;
+        }
+
         function getPrintPageHeightEstimate() {
             var inchProbe = document.createElement('div');
             inchProbe.style.position = 'absolute';
@@ -418,21 +428,22 @@
 
             var isPortrait = document.body.classList.contains('print-portrait');
             var pageHeightPx = pxPerInch * (isPortrait ? 11 : 8.5);
-            var headerEl = document.querySelector('header');
             var notationEl = document.querySelector('.notation-container');
-            var headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 0;
+            var rootStyles = window.getComputedStyle(document.documentElement);
             var notationStyles = notationEl ? window.getComputedStyle(notationEl) : null;
             var notationPaddingTop = notationStyles ? parseFloat(notationStyles.paddingTop) || 0 : 0;
             var notationPaddingBottom = notationStyles ? parseFloat(notationStyles.paddingBottom) || 0 : 0;
-            var bodyPaddingAllowance = pxPerInch * 0.8;
+            var topMargin = measureCssLength(rootStyles.getPropertyValue('--print-page-top-margin').trim()) || (pxPerInch * 1.2);
+            var bottomMargin = measureCssLength(rootStyles.getPropertyValue('--print-page-bottom-margin').trim()) || (pxPerInch * 0.4);
             var safetyBuffer = 24;
-            var gridGap = parseFloat(window.getComputedStyle(gridContainer).gap) || 0;
+            var availableHeight = Math.max(pageHeightPx - topMargin - bottomMargin - notationPaddingTop - notationPaddingBottom - safetyBuffer, 120);
 
             return {
-                firstPage: Math.max(pageHeightPx - headerHeight - notationPaddingTop - bodyPaddingAllowance - safetyBuffer - gridGap, 120),
-                followingPages: Math.max(pageHeightPx - headerHeight - notationPaddingTop - notationPaddingBottom - bodyPaddingAllowance - safetyBuffer, 120),
+                firstPage: availableHeight,
+                followingPages: availableHeight,
                 pageHeightPx: pageHeightPx,
-                bodyPaddingAllowance: bodyPaddingAllowance
+                topMargin: topMargin,
+                bottomMargin: bottomMargin
             };
         }
 
@@ -521,9 +532,12 @@
                 var pageGroup = document.createElement('div');
                 pageGroup.classList.add('print-page-group');
                 pageGroup.setAttribute('data-print-page', p);
+                var pageContent = document.createElement('div');
+                pageContent.classList.add('print-page-content');
                 for (var c = 0; c < pageCounts[p] && variantCursor < variantSections.length; c++) {
-                    pageGroup.appendChild(variantSections[variantCursor++]);
+                    pageContent.appendChild(variantSections[variantCursor++]);
                 }
+                pageGroup.appendChild(pageContent);
                 fragment.appendChild(pageGroup);
             }
 
@@ -533,28 +547,22 @@
                 gridContainer.appendChild(fragment);
             }
 
-            // Inject a header clone into every page group so the title repeats on each
-            // printed page, then hide the original header via the body class.
-            document.body.classList.add('has-print-pages');
-            var originalHeader = document.querySelector('header:not(.print-header-clone)');
             var pageGroupElements = gridContainer.querySelectorAll('.print-page-group');
-            var availablePageHeight = pageHeights.pageHeightPx - pageHeights.bodyPaddingAllowance;
-
-            // Pass 1: insert all clones (write-only — defers reflow until pass 2).
-            if (originalHeader) {
-                for (var gi = 0; gi < pageGroupElements.length; gi++) {
-                    var clone = originalHeader.cloneNode(true);
-                    clone.classList.add('print-header-clone');
-                    pageGroupElements[gi].insertBefore(clone, pageGroupElements[gi].firstChild);
-                }
-            }
-
-            // Pass 2: read heights and apply zoom scaling (single reflow after all writes).
             for (var si = 0; si < pageGroupElements.length; si++) {
-                var groupHeight = pageGroupElements[si].getBoundingClientRect().height;
-                if (groupHeight > availablePageHeight && groupHeight > 0) {
-                    pageGroupElements[si].style.zoom = String(availablePageHeight / groupHeight);
+                var pageContentEl = pageGroupElements[si].querySelector('.print-page-content');
+                var pageLimit = si === 0 ? pageHeights.firstPage : pageHeights.followingPages;
+                if (!pageContentEl) continue;
+
+                pageGroupElements[si].style.removeProperty('height');
+                pageContentEl.style.removeProperty('transform');
+
+                var groupHeight = pageContentEl.getBoundingClientRect().height;
+                var scale = 1;
+                if (groupHeight > pageLimit && groupHeight > 0) {
+                    scale = pageLimit / groupHeight;
+                    pageContentEl.style.transform = 'scale(' + scale + ')';
                 }
+                pageGroupElements[si].style.height = formatPx(groupHeight * scale);
             }
         }
 

@@ -555,12 +555,16 @@ test('uses print-safe variant sections and portrait mode for narrow stacked layo
     const styles = getComputedStyle(element);
     return {
       breakInside: styles.breakInside,
-      pageBreakInside: styles.pageBreakInside
+      pageBreakInside: styles.pageBreakInside,
+      headerPosition: getComputedStyle(document.querySelector('header')).position,
+      headerCloneCount: document.querySelectorAll('.print-header-clone').length
     };
   });
 
   expect(printStyles.breakInside).toContain('avoid');
   expect(printStyles.pageBreakInside).toContain('avoid');
+  expect(printStyles.headerPosition).toBe('fixed');
+  expect(printStyles.headerCloneCount).toBe(0);
 });
 
 test('balances print variant counts across grouped pages when variants span multiple pages', async ({ page }) => {
@@ -578,8 +582,7 @@ test('balances print variant counts across grouped pages when variants span mult
 
   const pageGroups = await page.evaluate(() => {
     return Array.from(document.querySelectorAll('.print-page-group')).map((group) => {
-      const variants = Array.from(group.children)
-        .filter((child) => child.classList.contains('variant-section'))
+      const variants = Array.from(group.querySelectorAll('.variant-section'))
         .map((child) => parseInt(child.getAttribute('data-variant'), 10));
       return {
         count: variants.length,
@@ -612,11 +615,50 @@ test('supports manually configured variants per print page with auto as default'
 
   const pageGroups = await page.evaluate(() =>
     Array.from(document.querySelectorAll('.print-page-group')).map((group) =>
-      Array.from(group.children).filter((child) => child.classList.contains('variant-section')).length
+      group.querySelectorAll('.variant-section').length
     )
   );
 
   expect(pageGroups).toEqual([2, 2, 1]);
+
+  await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+  await expect(page.locator('.print-page-group')).toHaveCount(0);
+});
+
+test('scales oversized print page groups to fit within the page height', async ({ page }) => {
+  await gotoApp(page);
+  await openHeaderMenu(page);
+  await page.locator('#barsSelect').fill('2');
+  await page.locator('#variantsSelect').fill('6');
+  await page.locator('#variantsPerPageSelect').selectOption('3');
+  await page.evaluate(() => {
+    for (var i = 0; i < 14; i++) {
+      document.getElementById('addTrackBtn').click();
+    }
+  });
+
+  await page.emulateMedia({ media: 'print' });
+  await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+
+  const pageMetrics = await page.evaluate(() => {
+    var pageHeights = getPrintPageHeightEstimate();
+    return Array.from(document.querySelectorAll('.print-page-group')).map((group, index) => {
+      var content = group.querySelector('.print-page-content');
+      var transform = content ? content.style.transform : '';
+      var match = transform && transform.match(/scale\(([^)]+)\)/);
+      return {
+        scale: match ? parseFloat(match[1]) : 1,
+        groupHeight: group.getBoundingClientRect().height,
+        pageLimit: index === 0 ? pageHeights.firstPage : pageHeights.followingPages
+      };
+    });
+  });
+
+  expect(pageMetrics.some((group) => group.scale < 1)).toBeTruthy();
+  pageMetrics.forEach((group) => {
+    expect(group.scale).toBeLessThanOrEqual(1);
+    expect(group.groupHeight).toBeLessThanOrEqual(group.pageLimit + 1);
+  });
 
   await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
   await expect(page.locator('.print-page-group')).toHaveCount(0);
