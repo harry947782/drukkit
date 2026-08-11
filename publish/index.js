@@ -1427,6 +1427,24 @@
 
             var labelSpacer = document.createElement('div');
             labelSpacer.classList.add('label-ctrls', 'reps-label-spacer');
+
+            var nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.classList.add('variant-name-input');
+            nameInput.value = getVariantName(variantIndex);
+            nameInput.setAttribute('aria-label', 'Variant ' + (variantIndex + 1) + ' name');
+            nameInput.setAttribute('maxlength', '60');
+            (function(idx) {
+                nameInput.addEventListener('input', function() {
+                    liveVariantNames[idx] = nameInput.value;
+                });
+                nameInput.addEventListener('change', function() {
+                    pushUndoSnapshot();
+                    liveVariantNames[idx] = nameInput.value;
+                    updateURL();
+                });
+            }(variantIndex));
+            labelSpacer.appendChild(nameInput);
             row.appendChild(labelSpacer);
 
             var grid = document.createElement('div');
@@ -1532,28 +1550,6 @@
             var variantSection = document.createElement('section');
             variantSection.classList.add('variant-section');
             variantSection.setAttribute('data-variant', variantIndex);
-
-            var heading = document.createElement('div');
-            heading.classList.add('variant-heading');
-
-            var nameInput = document.createElement('input');
-            nameInput.type = 'text';
-            nameInput.classList.add('variant-name-input');
-            nameInput.value = getVariantName(variantIndex);
-            nameInput.setAttribute('aria-label', 'Variant ' + (variantIndex + 1) + ' name');
-            nameInput.setAttribute('maxlength', '60');
-            (function(idx) {
-                nameInput.addEventListener('input', function() {
-                    liveVariantNames[idx] = nameInput.value;
-                });
-                nameInput.addEventListener('change', function() {
-                    pushUndoSnapshot();
-                    liveVariantNames[idx] = nameInput.value;
-                    updateURL();
-                });
-            }(variantIndex));
-            heading.appendChild(nameInput);
-            variantSection.appendChild(heading);
 
             gridContainer.appendChild(variantSection);
             return variantSection;

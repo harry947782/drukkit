@@ -45,18 +45,24 @@
             --layout-bar-gap: 36px;
             --layout-beat-gap: 20px;
             --layout-symbol-scale: 65%;
+            --layout-track-gap: 18px;
+            --layout-section-gap: 48px;
         }
         html.density-compact {
             --layout-grid-gap: 3px;
             --layout-bar-gap: 30px;
             --layout-beat-gap: 16px;
             --layout-symbol-scale: 70%;
+            --layout-track-gap: 12px;
+            --layout-section-gap: 36px;
         }
         html.density-dense {
             --layout-grid-gap: 2px;
             --layout-bar-gap: 24px;
             --layout-beat-gap: 12px;
             --layout-symbol-scale: 74%;
+            --layout-track-gap: 8px;
+            --layout-section-gap: 24px;
         }
 
         body.light-mode {
@@ -324,13 +330,13 @@
         .notation-grid-wrapper {
             display: flex;
             flex-direction: column;
-            gap: 48px; 
+            gap: var(--layout-section-gap, 48px); 
         }
 
         .variant-section {
             display: flex;
             flex-direction: column;
-            gap: 18px;
+            gap: var(--layout-track-gap, 18px);
             padding-top: 4px;
             border-top: 1px solid var(--step-border);
         }
@@ -741,7 +747,9 @@
         }
 
         .reps-label-spacer {
-            visibility: hidden;
+            display: flex;
+            align-items: flex-end;
+            padding-bottom: 2px;
         }
 
         .reps-grid .gap-bar-line::before {
@@ -1071,6 +1079,10 @@
                 color: #000000 !important;
                 break-after: avoid-page !important;
                 page-break-after: avoid !important;
+            }
+
+            .reps-label-spacer {
+                color: #000000 !important;
             }
 
             .variant-name-input {
