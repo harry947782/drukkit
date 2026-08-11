@@ -63,38 +63,7 @@
 
         var liveVariantReps = [];
         var liveVariantNames = [];
-        var densityModes = {
-            comfortable: {
-                barGap: 36,
-                beatGap: 20,
-                gridGap: 4,
-                symbolScale: 65,
-                minBarGap: 24,
-                minBeatGap: 10,
-                minGridGap: 2,
-                maxTrackWidth: 340
-            },
-            compact: {
-                barGap: 30,
-                beatGap: 16,
-                gridGap: 3,
-                symbolScale: 70,
-                minBarGap: 18,
-                minBeatGap: 8,
-                minGridGap: 1.5,
-                maxTrackWidth: 320
-            },
-            dense: {
-                barGap: 24,
-                beatGap: 12,
-                gridGap: 2,
-                symbolScale: 74,
-                minBarGap: 14,
-                minBeatGap: 6,
-                minGridGap: 1,
-                maxTrackWidth: 300
-            }
-        };
+        var validDensityModes = ['comfortable', 'compact', 'dense'];
 
         var textEncoder = new TextEncoder();
         var textDecoder = new TextDecoder();
@@ -135,18 +104,22 @@
             return Math.min(Math.max(value, min), max);
         }
 
-        function lerp(start, end, progress) {
-            return start + ((end - start) * progress);
-        }
-
         function formatPx(value) {
             return (Math.round(value * 10) / 10) + 'px';
         }
 
         function getDensityValue() {
-            var value = densitySelect && densityModes[densitySelect.value] ? densitySelect.value : 'comfortable';
+            var value = densitySelect && validDensityModes.indexOf(densitySelect.value) !== -1 ? densitySelect.value : 'comfortable';
             if (densitySelect && densitySelect.value !== value) densitySelect.value = value;
             return value;
+        }
+
+        function applyDensityClass(value) {
+            var root = document.documentElement;
+            for (var i = 0; i < validDensityModes.length; i++) {
+                root.classList.remove('density-' + validDensityModes[i]);
+            }
+            root.classList.add('density-' + (validDensityModes.indexOf(value) !== -1 ? value : 'comfortable'));
         }
 
         function measureLabelTextWidth(text) {
@@ -208,25 +181,15 @@
             };
         }
 
-        function computeSharedLayoutSizing(layoutContext) {
-            var densityValue = getDensityValue();
-            var densityConfig = densityModes[densityValue] || densityModes.comfortable;
-            var compression = clampNumber(Math.max(
-                (layoutContext.totalSteps - 16) / 48,
-                (layoutContext.totalBars - 2) / 10
-            ), 0, 1);
+        function computeSharedLayoutSizing() {
             var longestLabelWidth = getLongestTrackLabelWidth();
             var screenControlsWidth = 112;
             var labelPaddingWidth = 18;
             var printPaddingWidth = 8;
+            var maxLabelWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--density-max-label-width')) || 340;
 
             return {
-                density: densityValue,
-                barGap: lerp(densityConfig.barGap, densityConfig.minBarGap, compression),
-                beatGap: lerp(densityConfig.beatGap, densityConfig.minBeatGap, compression),
-                gridGap: lerp(densityConfig.gridGap, densityConfig.minGridGap, compression),
-                symbolScale: Math.round(lerp(densityConfig.symbolScale, densityConfig.symbolScale + 8, compression) * 10) / 10,
-                trackLabelWidth: clampNumber(longestLabelWidth + screenControlsWidth + labelPaddingWidth, 150, densityConfig.maxTrackWidth),
+                trackLabelWidth: clampNumber(longestLabelWidth + screenControlsWidth + labelPaddingWidth, 150, maxLabelWidth),
                 printTrackLabelWidth: clampNumber(longestLabelWidth + printPaddingWidth, 88, 220)
             };
         }
@@ -234,10 +197,6 @@
         function applySharedLayoutSizing(layoutMetrics) {
             document.documentElement.style.setProperty('--track-label-width', formatPx(layoutMetrics.trackLabelWidth));
             document.documentElement.style.setProperty('--print-track-label-width', formatPx(layoutMetrics.printTrackLabelWidth));
-            document.documentElement.style.setProperty('--layout-grid-gap', formatPx(layoutMetrics.gridGap));
-            document.documentElement.style.setProperty('--layout-bar-gap', formatPx(layoutMetrics.barGap));
-            document.documentElement.style.setProperty('--layout-beat-gap', formatPx(layoutMetrics.beatGap));
-            document.documentElement.style.setProperty('--layout-symbol-scale', layoutMetrics.symbolScale + '%');
         }
 
         function applyLabelColumnWidth(widthValue) {
@@ -251,7 +210,8 @@
         }
 
         function refreshLayoutSizing() {
-            globalCachedLayoutMetrics = computeSharedLayoutSizing(deriveCurrentLayoutContext());
+            applyDensityClass(getDensityValue());
+            globalCachedLayoutMetrics = computeSharedLayoutSizing();
             applySharedLayoutSizing(globalCachedLayoutMetrics);
             if (document.querySelector('.label-ctrls')) {
                 var isPrintMedia = window.matchMedia && window.matchMedia('print').matches;
@@ -383,7 +343,7 @@
             timeSigSelect.value = snapshot.time;
             barsSelect.value = snapshot.bars;
             variantsSelect.value = snapshot.variants;
-            if (densitySelect) densitySelect.value = densityModes[snapshot.density] ? snapshot.density : 'comfortable';
+            if (densitySelect) densitySelect.value = validDensityModes.indexOf(snapshot.density) !== -1 ? snapshot.density : 'comfortable';
 
             var options = timeSigConfig[snapshot.time].subs;
             subdivisionSelect.innerHTML = '';
@@ -1854,7 +1814,8 @@
             gridContainer.innerHTML = '';
             var layoutContext = deriveCurrentLayoutContext();
             globalCachedTotalSteps = layoutContext.totalSteps;
-            globalCachedLayoutMetrics = computeSharedLayoutSizing(layoutContext);
+            applyDensityClass(getDensityValue());
+            globalCachedLayoutMetrics = computeSharedLayoutSizing();
             applySharedLayoutSizing(globalCachedLayoutMetrics);
 
             var trackColumnsTemplate = [];
@@ -2021,7 +1982,7 @@
                     document.title = decompressed.title || defaultProjectTitle;
                     timeSigSelect.value = decompressed.time;
                     barsSelect.value = decompressed.bars;
-                    if (densitySelect) densitySelect.value = densityModes[decompressed.density] ? decompressed.density : 'comfortable';
+                    if (densitySelect) densitySelect.value = validDensityModes.indexOf(decompressed.density) !== -1 ? decompressed.density : 'comfortable';
                     compositionNotes.value = decompressed.notes || "";
                     variantsSelect.value = (decompressed.variants && decompressed.variants.length) || defaultVariantCount;
                     
@@ -2090,7 +2051,7 @@
                 document.title = titleVal;
                 timeSigSelect.value = timeVal;
                 barsSelect.value = barsVal;
-                if (densitySelect) densitySelect.value = densityModes[densityVal] ? densityVal : 'comfortable';
+                if (densitySelect) densitySelect.value = validDensityModes.indexOf(densityVal) !== -1 ? densityVal : 'comfortable';
                 compositionNotes.value = notesVal;
                 
                 var options = timeSigConfig[timeVal].subs;
@@ -2289,7 +2250,7 @@
                 timeSigSelect.value = state.time;
                 barsSelect.value = state.bars;
                 subdivisionSelect.value = state.sub;
-                if (densitySelect) densitySelect.value = densityModes[state.density] ? state.density : 'comfortable';
+                if (densitySelect) densitySelect.value = validDensityModes.indexOf(state.density) !== -1 ? state.density : 'comfortable';
                 compositionNotes.value = state.notes;
 
                 updateSubdivisionDropdown();

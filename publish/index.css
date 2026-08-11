@@ -43,6 +43,29 @@
             --svg-plus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath stroke='%23ffffff' stroke-width='3.5' stroke-linecap='round' d='M12,4 L12,20 M4,12 L20,12'/%3E%3C/svg%3E");
         }
 
+        /* Density mode classes — JS swaps these on <html> to change all spacing */
+        html.density-comfortable {
+            --layout-grid-gap: 4px;
+            --layout-bar-gap: 36px;
+            --layout-beat-gap: 20px;
+            --layout-symbol-scale: 65%;
+            --density-max-label-width: 340px;
+        }
+        html.density-compact {
+            --layout-grid-gap: 3px;
+            --layout-bar-gap: 30px;
+            --layout-beat-gap: 16px;
+            --layout-symbol-scale: 70%;
+            --density-max-label-width: 320px;
+        }
+        html.density-dense {
+            --layout-grid-gap: 2px;
+            --layout-bar-gap: 24px;
+            --layout-beat-gap: 12px;
+            --layout-symbol-scale: 74%;
+            --density-max-label-width: 300px;
+        }
+
         body.light-mode {
             /* Light Mode Overrides */
             --bg-color: #f8f9fa;
