@@ -36,6 +36,7 @@
         var variantsSelect = document.getElementById('variantsSelect');
         var subdivisionSelect = document.getElementById('subdivisionSelect');
         var densitySelect = document.getElementById('densitySelect');
+        var printScaleSelect = document.getElementById('printScaleSelect');
         var addTrackBtn = document.getElementById('addTrackBtn');
         var projectTitle = document.getElementById('projectTitle');
         var compositionNotes = document.getElementById('compositionNotes');
@@ -64,6 +65,7 @@
         var liveVariantReps = [];
         var liveVariantNames = [];
         var validDensityModes = ['comfortable', 'compact', 'dense'];
+        var validPrintScales = ['100', '90', '80', '70', '60'];
 
         var textEncoder = new TextEncoder();
         var textDecoder = new TextDecoder();
@@ -111,6 +113,12 @@
         function getDensityValue() {
             var value = densitySelect && validDensityModes.indexOf(densitySelect.value) !== -1 ? densitySelect.value : 'comfortable';
             if (densitySelect && densitySelect.value !== value) densitySelect.value = value;
+            return value;
+        }
+
+        function getPrintScaleValue() {
+            var value = printScaleSelect && validPrintScales.indexOf(printScaleSelect.value) !== -1 ? printScaleSelect.value : '100';
+            if (printScaleSelect && printScaleSelect.value !== value) printScaleSelect.value = value;
             return value;
         }
 
@@ -299,6 +307,7 @@
                 variants: variantsSelect.value,
                 sub: subdivisionSelect.value,
                 density: getDensityValue(),
+                printScale: getPrintScaleValue(),
                 beatSubOverrides: JSON.parse(JSON.stringify(beatSubOverrides)),
                 notes: compositionNotes.value,
                 instruments: liveInstrumentsMemory.map(function(inst) {
@@ -344,6 +353,7 @@
             barsSelect.value = snapshot.bars;
             variantsSelect.value = snapshot.variants;
             if (densitySelect) densitySelect.value = validDensityModes.indexOf(snapshot.density) !== -1 ? snapshot.density : 'comfortable';
+            if (printScaleSelect) printScaleSelect.value = validPrintScales.indexOf(snapshot.printScale) !== -1 ? snapshot.printScale : '100';
 
             var options = timeSigConfig[snapshot.time].subs;
             subdivisionSelect.innerHTML = '';
@@ -573,7 +583,7 @@
 
         // Compression/decompression functions for QR code URL optimization
         var MAX_URL_LENGTH = 2000;
-        function compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, repsData, variantNamesArr, densityVal) {
+        function compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, repsData, variantNamesArr, densityVal, printScaleVal) {
             // Bit layout (16-bit value):
             //   Bit 15: hasVariantNames flag
             //   Bit 14: hasReps flag
@@ -695,6 +705,9 @@
             
             var densityIndexMap = {comfortable: 0, compact: 1, dense: 2};
             data.push(densityIndexMap[densityVal] !== undefined ? densityIndexMap[densityVal] : 0);
+
+            var printScaleIndexMap = {'100': 0, '90': 1, '80': 2, '70': 3, '60': 4};
+            data.push(printScaleIndexMap[printScaleVal] !== undefined ? printScaleIndexMap[printScaleVal] : 0);
 
             // Convert data array to binary string and encode as base64
             var binaryString = '';
@@ -818,12 +831,19 @@
                 if (idx < allData.length) {
                     densityVal = densityReverseMap[allData.charCodeAt(idx++)] || 'comfortable';
                 }
+
+                var printScaleReverseMap = {0: '100', 1: '90', 2: '80', 3: '70', 4: '60'};
+                var printScaleVal = '100';
+                if (idx < allData.length) {
+                    printScaleVal = printScaleReverseMap[allData.charCodeAt(idx++)] || '100';
+                }
                 
                 return {
                     time: timeVal,
                     bars: barsVal,
                     sub: subVal,
                     density: densityVal,
+                    printScale: printScaleVal,
                     title: titleVal,
                     notes: notesVal,
                     tracks: decompTracks,
@@ -850,6 +870,7 @@
             var variantCount = getSanitizedVariantsCount();
             var subVal = subdivisionSelect.value;
             var densityVal = getDensityValue();
+            var printScaleVal = getPrintScaleValue();
             var notesVal = compositionNotes.value;
             
             var savedVariants = normalizeVariantNotesList(extractAllVariantNotes(), variantCount);
@@ -863,6 +884,7 @@
             params.set('bars', barsVal);
             params.set('sub', subVal);
             if (densityVal !== 'comfortable') params.set('density', densityVal);
+            if (printScaleVal !== '100') params.set('printscale', printScaleVal);
             params.set('notes', notesVal);
             params.set('tracks', JSON.stringify(tracksPayload));
             if (variantCount > 1) {
@@ -895,7 +917,7 @@
             // The compressed value is also reused for the QR code below to avoid compressing twice.
             var compressed = null;
             if (!hasBeatSubOverrides && newUrl.length > MAX_URL_LENGTH) {
-                compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, liveVariantReps, liveVariantNames, densityVal);
+                compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, liveVariantReps, liveVariantNames, densityVal, printScaleVal);
                 var compressedParams = new URLSearchParams();
                 compressedParams.set('c', compressed);
                 newUrl = buildBaseUrl() + '?' + compressedParams.toString();
@@ -917,7 +939,7 @@
                     }
                 } else {
                     if (!compressed) {
-                        compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, liveVariantReps, liveVariantNames, densityVal);
+                        compressed = compressState(tracksPayload, timeVal, barsVal, subVal, titleVal, notesVal, variantsPayload, liveVariantReps, liveVariantNames, densityVal, printScaleVal);
                     }
                     var qrParams = new URLSearchParams();
                     qrParams.set('c', compressed);
@@ -1931,6 +1953,8 @@
         }
 
         function preparePrintLayout() {
+            var printScale = getPrintScaleValue();
+            document.documentElement.style.zoom = printScale !== '100' ? (parseInt(printScale, 10) / 100).toString() : '';
             refreshLayoutSizing();
             if (globalCachedLayoutMetrics) {
                 applyLabelColumnWidth(globalCachedLayoutMetrics.printTrackLabelWidth);
@@ -1939,6 +1963,7 @@
         }
 
         function restoreScreenLayout() {
+            document.documentElement.style.zoom = '';
             refreshLayoutSizing();
             if (globalCachedLayoutMetrics) {
                 applyLabelColumnWidth(globalCachedLayoutMetrics.trackLabelWidth);
@@ -1979,6 +2004,7 @@
                     timeSigSelect.value = decompressed.time;
                     barsSelect.value = decompressed.bars;
                     if (densitySelect) densitySelect.value = validDensityModes.indexOf(decompressed.density) !== -1 ? decompressed.density : 'comfortable';
+                    if (printScaleSelect) printScaleSelect.value = validPrintScales.indexOf(decompressed.printScale) !== -1 ? decompressed.printScale : '100';
                     compositionNotes.value = decompressed.notes || "";
                     variantsSelect.value = (decompressed.variants && decompressed.variants.length) || defaultVariantCount;
                     
@@ -2041,6 +2067,7 @@
                 var barsVal = params.get('bars') || "2";
                 var subVal = params.get('sub') || "16th";
                 var densityVal = params.get('density') || 'comfortable';
+                var printScaleVal = params.get('printscale') || '100';
                 var notesVal = params.get('notes') || "";
                 
                 projectTitle.value = titleVal;
@@ -2048,6 +2075,7 @@
                 timeSigSelect.value = timeVal;
                 barsSelect.value = barsVal;
                 if (densitySelect) densitySelect.value = validDensityModes.indexOf(densityVal) !== -1 ? densityVal : 'comfortable';
+                if (printScaleSelect) printScaleSelect.value = validPrintScales.indexOf(printScaleVal) !== -1 ? printScaleVal : '100';
                 compositionNotes.value = notesVal;
                 
                 var options = timeSigConfig[timeVal].subs;
@@ -2130,6 +2158,7 @@
                 compositionNotes.value = "";
                 variantsSelect.value = defaultVariantCount;
                 if (densitySelect) densitySelect.value = 'comfortable';
+                if (printScaleSelect) printScaleSelect.value = '100';
                 liveVariantReps = [];
                 liveVariantNames = [];
                 updateSubdivisionDropdown();
@@ -2164,6 +2193,7 @@
                 var variantCount = getSanitizedVariantsCount();
                 var subVal = subdivisionSelect.value;
                 var densityVal = getDensityValue();
+                var printScaleVal = getPrintScaleValue();
                 var notesVal = compositionNotes.value;
                 var savedVariants = normalizeVariantNotesList(extractAllVariantNotes(), variantCount);
                 var tracksPayload = buildTracksPayload(savedVariants[0] || {});
@@ -2180,6 +2210,7 @@
                         bars: barsVal,
                         sub: subVal,
                         density: densityVal,
+                        printScale: printScaleVal,
                         notes: notesVal,
                         tracks: tracksPayload,
                         variants: variantCount > 1 ? variantsPayload : null,
@@ -2212,6 +2243,7 @@
                 bars: barsSelect.value,
                 sub: subdivisionSelect.value,
                 density: getDensityValue(),
+                printScale: getPrintScaleValue(),
                 notes: compositionNotes.value,
                 tracks: tracksPayload,
                 variants: variantCount > 1 ? variantsPayload : null,
@@ -2247,6 +2279,7 @@
                 barsSelect.value = state.bars;
                 subdivisionSelect.value = state.sub;
                 if (densitySelect) densitySelect.value = validDensityModes.indexOf(state.density) !== -1 ? state.density : 'comfortable';
+                if (printScaleSelect) printScaleSelect.value = validPrintScales.indexOf(state.printScale) !== -1 ? state.printScale : '100';
                 compositionNotes.value = state.notes;
 
                 updateSubdivisionDropdown();
@@ -2475,6 +2508,13 @@
             handleConfigurationLifecycle(false);
             updateURL();
         };
+
+        if (printScaleSelect) {
+            printScaleSelect.onchange = function() {
+                pushUndoSnapshot();
+                updateURL();
+            };
+        }
 
         addTrackBtn.onclick = function() {
             pushUndoSnapshot();
