@@ -974,17 +974,17 @@
            ========================================================================== */
         @media print {
             @page {
-                margin: var(--print-page-top-margin) var(--print-page-side-margin) var(--print-page-bottom-margin); 
+                margin: 3cm 1cm 1cm; 
             }
 
             @page landscapePage {
                 size: landscape;
-                margin: var(--print-page-top-margin) var(--print-page-side-margin) var(--print-page-bottom-margin);
+                margin: 3cm 1cm 1cm;
             }
 
             @page portraitPage {
                 size: portrait;
-                margin: var(--print-page-top-margin) var(--print-page-side-margin) var(--print-page-bottom-margin);
+                margin: 3cm 1cm 1cm;
             }
 
             * {
