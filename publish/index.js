@@ -370,11 +370,16 @@
         }
 
         function unwrapPrintPageGroups() {
+            document.body.classList.remove('has-print-pages');
             var pageGroups = gridContainer.querySelectorAll('.print-page-group');
             if (!pageGroups.length) return;
 
             var variantSections = [];
             for (var i = 0; i < pageGroups.length; i++) {
+                var clones = pageGroups[i].querySelectorAll('.print-header-clone');
+                for (var j = 0; j < clones.length; j++) {
+                    clones[j].parentNode.removeChild(clones[j]);
+                }
                 while (pageGroups[i].firstChild) {
                     var variantNode = pageGroups[i].firstChild;
                     pageGroups[i].removeChild(variantNode);
@@ -425,7 +430,9 @@
 
             return {
                 firstPage: Math.max(pageHeightPx - headerHeight - notationPaddingTop - bodyPaddingAllowance - safetyBuffer - gridGap, 120),
-                followingPages: Math.max(pageHeightPx - notationPaddingTop - notationPaddingBottom - bodyPaddingAllowance - safetyBuffer, 120)
+                followingPages: Math.max(pageHeightPx - headerHeight - notationPaddingTop - notationPaddingBottom - bodyPaddingAllowance - safetyBuffer, 120),
+                pageHeightPx: pageHeightPx,
+                bodyPaddingAllowance: bodyPaddingAllowance
             };
         }
 
@@ -458,13 +465,13 @@
 
             var manualVariantsPerPage = getSanitizedVariantsPerPageCount();
             var pageCounts = [];
+            var pageHeights = getPrintPageHeightEstimate();
 
             if (manualVariantsPerPage > 0) {
                 for (var mv = 0; mv < variantSections.length; mv += manualVariantsPerPage) {
                     pageCounts.push(Math.min(manualVariantsPerPage, variantSections.length - mv));
                 }
             } else {
-                var pageHeights = getPrintPageHeightEstimate();
                 var groupGap = parseFloat(window.getComputedStyle(gridContainer).gap) || 0;
                 var variantHeights = [];
                 for (var i = 0; i < variantSections.length; i++) {
@@ -524,6 +531,30 @@
                 gridContainer.insertBefore(fragment, headerRow.nextSibling);
             } else {
                 gridContainer.appendChild(fragment);
+            }
+
+            // Inject a header clone into every page group so the title repeats on each
+            // printed page, then hide the original header via the body class.
+            document.body.classList.add('has-print-pages');
+            var originalHeader = document.querySelector('header:not(.print-header-clone)');
+            var pageGroupElements = gridContainer.querySelectorAll('.print-page-group');
+            var availablePageHeight = pageHeights.pageHeightPx - pageHeights.bodyPaddingAllowance;
+
+            // Pass 1: insert all clones (write-only — defers reflow until pass 2).
+            if (originalHeader) {
+                for (var gi = 0; gi < pageGroupElements.length; gi++) {
+                    var clone = originalHeader.cloneNode(true);
+                    clone.classList.add('print-header-clone');
+                    pageGroupElements[gi].insertBefore(clone, pageGroupElements[gi].firstChild);
+                }
+            }
+
+            // Pass 2: read heights and apply zoom scaling (single reflow after all writes).
+            for (var si = 0; si < pageGroupElements.length; si++) {
+                var groupHeight = pageGroupElements[si].getBoundingClientRect().height;
+                if (groupHeight > availablePageHeight && groupHeight > 0) {
+                    pageGroupElements[si].style.zoom = String(availablePageHeight / groupHeight);
+                }
             }
         }
 
