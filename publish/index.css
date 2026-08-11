@@ -1138,7 +1138,7 @@
             /* Maintain physical bounding frame symmetry for both empty and active grid elements */
             .step {
                 background-color: transparent !important; 
-                border: 1px solid #d0d0d0 !important; 
+                border: 1px solid #ffffff !important; 
                 border-radius: 2px !important;
                 overflow: visible !important;
             }
@@ -1146,7 +1146,7 @@
             /* Lock container bounds to keep box proportions identical to empty cell blocks */
             .step.active, .step.hand-R, .step.hand-L {
                 background-color: transparent !important; 
-                border-color: #d0d0d0 !important;
+                border-color: #ffffff !important;
                 background-repeat: no-repeat !important;
                 background-position: center !important;
                 background-size: var(--layout-symbol-scale) !important;
