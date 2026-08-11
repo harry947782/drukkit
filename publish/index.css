@@ -26,10 +26,6 @@
             --menu-shadow: 0 20px 45px rgba(0, 0, 0, 0.28);
             --track-label-width: 220px;
             --print-track-label-width: 140px;
-            --layout-grid-gap: 4px;
-            --layout-bar-gap: 36px;
-            --layout-beat-gap: 20px;
-            --layout-symbol-scale: 65%;
             
             /* Vector Graphics Injection */
             --svg-circle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%23ffffff'/%3E%3C/svg%3E");
@@ -49,21 +45,18 @@
             --layout-bar-gap: 36px;
             --layout-beat-gap: 20px;
             --layout-symbol-scale: 65%;
-            --density-max-label-width: 340px;
         }
         html.density-compact {
             --layout-grid-gap: 3px;
             --layout-bar-gap: 30px;
             --layout-beat-gap: 16px;
             --layout-symbol-scale: 70%;
-            --density-max-label-width: 320px;
         }
         html.density-dense {
             --layout-grid-gap: 2px;
             --layout-bar-gap: 24px;
             --layout-beat-gap: 12px;
             --layout-symbol-scale: 74%;
-            --density-max-label-width: 300px;
         }
 
         body.light-mode {
